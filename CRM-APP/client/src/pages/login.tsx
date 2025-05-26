@@ -1,69 +1,109 @@
-import Link from 'next/link';
-import { useAppContext } from '../context/LanguageContext';
-import Layout from '../components/Layout';
-import { useState } from 'react';
-
-const translations = {
-  en: {
-    login: 'Login',
-    email: 'Email',
-    password: 'Password',
-    showPassword: 'Show Password',
-    loginButton: 'Log In',
-    noAccount: "Don't have an account?",
-    registerHere: 'Sign Up',
-  },
-  fr: {
-    login: 'Connexion',
-    email: 'Email',
-    password: 'Mot de passe',
-    showPassword: 'Afficher le mot de passe',
-    loginButton: 'Se connecter',
-    noAccount: "Vous n'avez pas de compte ?",
-    registerHere: 'Inscrivez-vous',
-  },
-};
+import { useState } from "react";
+import Link from "next/link";
+import { useRouter } from "next/router";
+import Layout from "../components/Layout";
+import { useAppContext, useTranslations } from "../context/LanguageContext";
 
 const LoginPage = () => {
-  const { language, darkMode } = useAppContext();
-  const t = translations[language];
+  const router = useRouter();
+  const { darkMode } = useAppContext();
+  const t = useTranslations();
+  const [formData, setFormData] = useState({
+    email: "",
+    password: "",
+  });
   const [showPassword, setShowPassword] = useState(false);
+
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const { name, value } = e.target;
+    setFormData((prev) => ({ ...prev, [name]: value }));
+  };
+
+  const toggleShowPassword = () => {
+    setShowPassword((prev) => !prev);
+  };
+
+  const handleLogin = () => {
+    console.log("Logging in with:", formData);
+    router.push("/dashboard");
+  };
 
   return (
     <Layout>
-      <div className={`p-6 rounded-lg shadow-md ${darkMode ? 'bg-gray-800 text-gray-200' : 'bg-white text-gray-800'}`}>
-        <h2 className="text-3xl font-bold text-center mb-8">{t.login}</h2>
-        <div className="space-y-6">
-          <div>
-            <label className="block text-lg font-medium mb-2">{t.email}</label>
-            <input
-              type="email"
-              placeholder={t.email}
-              className={`w-full px-4 py-3 border rounded-md ${darkMode ? 'bg-gray-700 border-gray-600 text-gray-200' : 'bg-gray-50 border-gray-300 text-gray-800'} focus:outline-none focus:ring-2 focus:ring-purple-500`}
-            />
+      <div
+        className={`min-h-screen flex items-center justify-center ${
+          darkMode ? "bg-gray-900" : "bg-gray-50"
+        }`}
+      >
+        <div
+          className={`p-8 rounded-xl shadow-lg w-full max-w-md border ${
+            darkMode
+              ? "bg-gray-800 border-gray-700"
+              : "bg-white border-gray-200"
+          }`}
+        >
+          <h2
+            className="text-3xl font-bold mb-6 text-center"
+            style={{ color: darkMode ? "white" : "black" }}
+          >
+            {t.login}
+          </h2>
+          <div className="space-y-6">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                {t.email}
+              </label>
+              <input
+                type="email"
+                name="email"
+                value={formData.email}
+                onChange={handleInputChange}
+                className={`w-full px-4 py-3 border rounded-lg ${
+                  darkMode
+                    ? "bg-gray-700 border-gray-600 text-gray-200"
+                    : "bg-gray-50 border-gray-200 text-gray-800"
+                } focus:outline-none focus:ring-2 focus:ring-purple-500`}
+                placeholder={t.email}
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                {t.password}
+              </label>
+              <div className="relative">
+                <input
+                  type={showPassword ? "text" : "password"}
+                  name="password"
+                  value={formData.password}
+                  onChange={handleInputChange}
+                  className={`w-full px-4 py-3 border rounded-lg ${
+                    darkMode
+                      ? "bg-gray-700 border-gray-600 text-gray-200"
+                      : "bg-gray-50 border-gray-200 text-gray-800"
+                  } focus:outline-none focus:ring-2 focus:ring-purple-500`}
+                  placeholder={t.password}
+                />
+                <button
+                  type="button"
+                  onClick={toggleShowPassword}
+                  className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-500 dark:text-gray-400"
+                >
+                  {showPassword ? "👁️‍🗨️" : "👁️"}
+                </button>
+              </div>
+            </div>
           </div>
-          <div>
-            <label className="block text-lg font-medium mb-2">{t.password}</label>
-            <input
-              type={showPassword ? 'text' : 'password'}
-              placeholder={t.password}
-              className={`w-full px-4 py-3 border rounded-md ${darkMode ? 'bg-gray-700 border-gray-600 text-gray-200' : 'bg-gray-50 border-gray-300 text-gray-800'} focus:outline-none focus:ring-2 focus:ring-purple-500`}
-            />
-          </div>
-          <div className="flex items-center">
-            <input
-              type="checkbox"
-              checked={showPassword}
-              onChange={() => setShowPassword(!showPassword)}
-              className="mr-3 h-5 w-5"
-            />
-            <label className="text-lg">{t.showPassword}</label>
-          </div>
-          <button className="w-full bg-purple-600 text-white py-3 rounded-md text-lg font-semibold hover:bg-purple-700 transition">
-            {t.loginButton}
+          <button
+            onClick={handleLogin}
+            className="w-full mt-8 bg-gradient-to-r from-purple-500 to-pink-500 text-white py-3 rounded-lg hover:from-purple-600 hover:to-pink-600 transition-all duration-200"
+          >
+            {t.login}
           </button>
-          <p className="text-center text-lg">
-            {t.noAccount} <Link href="/register" className="text-purple-600 hover:underline">{t.registerHere}</Link>
+          <p className="mt-4 text-center text-sm text-gray-600 dark:text-gray-400">
+            {t.dontHaveAccount}{" "}
+            <Link href="/register" className="text-purple-600 hover:underline">
+              {t.registerHere}
+            </Link>
           </p>
         </div>
       </div>
