@@ -1,8 +1,11 @@
-import { useState, useEffect } from 'react';
-import Link from 'next/link';
-import Sidebar from '../components/Sidebar';
-import { useAppContext, useTranslations } from '../context/LanguageContext';
-import * as XLSX from 'xlsx';
+import { useState, useEffect } from "react";
+import Link from "next/link";
+import Sidebar from "../components/Sidebar";
+import {
+  useLanguageContext,
+  useTranslations,
+} from "../context/LanguageContext";
+import * as XLSX from "xlsx";
 
 interface Purchase {
   id: number;
@@ -14,11 +17,25 @@ interface Purchase {
 }
 
 const PurchasesPage = () => {
-  const { darkMode } = useAppContext();
+  const { darkMode } = useLanguageContext();
   const t = useTranslations();
   const [purchases, setPurchases] = useState<Purchase[]>([
-    { id: 1, supplierId: 1, productId: 1, quantity: 10, totalCost: 8500.00, date: '2025-05-20' },
-    { id: 2, supplierId: 2, productId: 2, quantity: 50, totalCost: 2000.00, date: '2025-05-21' },
+    {
+      id: 1,
+      supplierId: 1,
+      productId: 1,
+      quantity: 10,
+      totalCost: 8500.0,
+      date: "2025-05-20",
+    },
+    {
+      id: 2,
+      supplierId: 2,
+      productId: 2,
+      quantity: 50,
+      totalCost: 2000.0,
+      date: "2025-05-21",
+    },
   ]);
   const [newPurchase, setNewPurchase] = useState<Purchase>({
     id: 0,
@@ -26,11 +43,12 @@ const PurchasesPage = () => {
     productId: 0,
     quantity: 0,
     totalCost: 0,
-    date: new Date().toISOString().split('T')[0],
+    date: new Date().toISOString().split("T")[0],
   });
   const [editPurchase, setEditPurchase] = useState<Purchase | null>(null);
-  const [searchQuery, setSearchQuery] = useState('');
-  const [filteredPurchases, setFilteredPurchases] = useState<Purchase[]>(purchases);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [filteredPurchases, setFilteredPurchases] =
+    useState<Purchase[]>(purchases);
 
   // Autosearch functionality
   useEffect(() => {
@@ -51,7 +69,9 @@ const PurchasesPage = () => {
       newPurchase.totalCost > 0 &&
       newPurchase.date
     ) {
-      const newId = purchases.length ? purchases[purchases.length - 1].id + 1 : 1;
+      const newId = purchases.length
+        ? purchases[purchases.length - 1].id + 1
+        : 1;
       setPurchases([...purchases, { ...newPurchase, id: newId }]);
       setNewPurchase({
         id: 0,
@@ -59,10 +79,10 @@ const PurchasesPage = () => {
         productId: 0,
         quantity: 0,
         totalCost: 0,
-        date: new Date().toISOString().split('T')[0],
+        date: new Date().toISOString().split("T")[0],
       });
     } else {
-      alert('Please fill all fields with valid data.');
+      alert("Please fill all fields with valid data.");
     }
   };
 
@@ -91,8 +111,8 @@ const PurchasesPage = () => {
   const handleExport = () => {
     const ws = XLSX.utils.json_to_sheet(purchases);
     const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, 'Purchases');
-    XLSX.writeFile(wb, 'purchases.xlsx');
+    XLSX.utils.book_append_sheet(wb, ws, "Purchases");
+    XLSX.writeFile(wb, "purchases.xlsx");
   };
 
   // Import from Excel
@@ -102,10 +122,11 @@ const PurchasesPage = () => {
       const reader = new FileReader();
       reader.onload = (e) => {
         const data = new Uint8Array(e.target?.result as ArrayBuffer);
-        const workbook = XLSX.read(data, { type: 'array' });
+        const workbook = XLSX.read(data, { type: "array" });
         const sheetName = workbook.SheetNames[0];
         const worksheet = workbook.Sheets[sheetName];
-        const importedPurchases: Purchase[] = XLSX.utils.sheet_to_json(worksheet);
+        const importedPurchases: Purchase[] =
+          XLSX.utils.sheet_to_json(worksheet);
         setPurchases([...purchases, ...importedPurchases]);
       };
       reader.readAsArrayBuffer(file);
@@ -113,10 +134,16 @@ const PurchasesPage = () => {
   };
 
   return (
-    <div className={`flex min-h-screen ${darkMode ? 'bg-gray-900 text-gray-200' : 'bg-gray-50 text-gray-800'}`}>
+    <div
+      className={`flex min-h-screen ${
+        darkMode ? "bg-gray-900 text-gray-200" : "bg-gray-50 text-gray-800"
+      }`}
+    >
       <Sidebar />
       <div className="flex-1 p-8">
-        <h2 className="text-4xl font-bold mb-8 text-gray-900 dark:text-white">{t.purchases}</h2>
+        <h2 className="text-4xl font-bold mb-8 text-gray-900 dark:text-white">
+          {t.purchases}
+        </h2>
 
         {/* Add Purchase Form */}
         <div className="mb-8 p-6 rounded-xl shadow-lg bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700">
@@ -127,46 +154,94 @@ const PurchasesPage = () => {
             <input
               type="number"
               placeholder="Supplier ID"
-              value={editPurchase ? editPurchase.supplierId : newPurchase.supplierId}
+              value={
+                editPurchase ? editPurchase.supplierId : newPurchase.supplierId
+              }
               onChange={(e) =>
                 editPurchase
-                  ? setEditPurchase({ ...editPurchase, supplierId: parseInt(e.target.value) || 0 })
-                  : setNewPurchase({ ...newPurchase, supplierId: parseInt(e.target.value) || 0 })
+                  ? setEditPurchase({
+                      ...editPurchase,
+                      supplierId: parseInt(e.target.value) || 0,
+                    })
+                  : setNewPurchase({
+                      ...newPurchase,
+                      supplierId: parseInt(e.target.value) || 0,
+                    })
               }
-              className={`px-4 py-3 border rounded-lg ${darkMode ? 'bg-gray-700 border-gray-600 text-gray-200' : 'bg-gray-50 border-gray-200 text-gray-800'} focus:outline-none focus:ring-2 focus:ring-purple-500`}
+              className={`px-4 py-3 border rounded-lg ${
+                darkMode
+                  ? "bg-gray-700 border-gray-600 text-gray-200"
+                  : "bg-gray-50 border-gray-200 text-gray-800"
+              } focus:outline-none focus:ring-2 focus:ring-purple-500`}
             />
             <input
               type="number"
               placeholder="Product ID"
-              value={editPurchase ? editPurchase.productId : newPurchase.productId}
+              value={
+                editPurchase ? editPurchase.productId : newPurchase.productId
+              }
               onChange={(e) =>
                 editPurchase
-                  ? setEditPurchase({ ...editPurchase, productId: parseInt(e.target.value) || 0 })
-                  : setNewPurchase({ ...newPurchase, productId: parseInt(e.target.value) || 0 })
+                  ? setEditPurchase({
+                      ...editPurchase,
+                      productId: parseInt(e.target.value) || 0,
+                    })
+                  : setNewPurchase({
+                      ...newPurchase,
+                      productId: parseInt(e.target.value) || 0,
+                    })
               }
-              className={`px-4 py-3 border rounded-lg ${darkMode ? 'bg-gray-700 border-gray-600 text-gray-200' : 'bg-gray-50 border-gray-200 text-gray-800'} focus:outline-none focus:ring-2 focus:ring-purple-500`}
+              className={`px-4 py-3 border rounded-lg ${
+                darkMode
+                  ? "bg-gray-700 border-gray-600 text-gray-200"
+                  : "bg-gray-50 border-gray-200 text-gray-800"
+              } focus:outline-none focus:ring-2 focus:ring-purple-500`}
             />
             <input
               type="number"
               placeholder="Quantity"
-              value={editPurchase ? editPurchase.quantity : newPurchase.quantity}
+              value={
+                editPurchase ? editPurchase.quantity : newPurchase.quantity
+              }
               onChange={(e) =>
                 editPurchase
-                  ? setEditPurchase({ ...editPurchase, quantity: parseInt(e.target.value) || 0 })
-                  : setNewPurchase({ ...newPurchase, quantity: parseInt(e.target.value) || 0 })
+                  ? setEditPurchase({
+                      ...editPurchase,
+                      quantity: parseInt(e.target.value) || 0,
+                    })
+                  : setNewPurchase({
+                      ...newPurchase,
+                      quantity: parseInt(e.target.value) || 0,
+                    })
               }
-              className={`px-4 py-3 border rounded-lg ${darkMode ? 'bg-gray-700 border-gray-600 text-gray-200' : 'bg-gray-50 border-gray-200 text-gray-800'} focus:outline-none focus:ring-2 focus:ring-purple-500`}
+              className={`px-4 py-3 border rounded-lg ${
+                darkMode
+                  ? "bg-gray-700 border-gray-600 text-gray-200"
+                  : "bg-gray-50 border-gray-200 text-gray-800"
+              } focus:outline-none focus:ring-2 focus:ring-purple-500`}
             />
             <input
               type="number"
               placeholder="Total Cost"
-              value={editPurchase ? editPurchase.totalCost : newPurchase.totalCost}
+              value={
+                editPurchase ? editPurchase.totalCost : newPurchase.totalCost
+              }
               onChange={(e) =>
                 editPurchase
-                  ? setEditPurchase({ ...editPurchase, totalCost: parseFloat(e.target.value) || 0 })
-                  : setNewPurchase({ ...newPurchase, totalCost: parseFloat(e.target.value) || 0 })
+                  ? setEditPurchase({
+                      ...editPurchase,
+                      totalCost: parseFloat(e.target.value) || 0,
+                    })
+                  : setNewPurchase({
+                      ...newPurchase,
+                      totalCost: parseFloat(e.target.value) || 0,
+                    })
               }
-              className={`px-4 py-3 border rounded-lg ${darkMode ? 'bg-gray-700 border-gray-600 text-gray-200' : 'bg-gray-50 border-gray-200 text-gray-800'} focus:outline-none focus:ring-2 focus:ring-purple-500`}
+              className={`px-4 py-3 border rounded-lg ${
+                darkMode
+                  ? "bg-gray-700 border-gray-600 text-gray-200"
+                  : "bg-gray-50 border-gray-200 text-gray-800"
+              } focus:outline-none focus:ring-2 focus:ring-purple-500`}
             />
             <input
               type="date"
@@ -176,7 +251,11 @@ const PurchasesPage = () => {
                   ? setEditPurchase({ ...editPurchase, date: e.target.value })
                   : setNewPurchase({ ...newPurchase, date: e.target.value })
               }
-              className={`px-4 py-3 border rounded-lg ${darkMode ? 'bg-gray-700 border-gray-600 text-gray-200' : 'bg-gray-50 border-gray-200 text-gray-800'} focus:outline-none focus:ring-2 focus:ring-purple-500`}
+              className={`px-4 py-3 border rounded-lg ${
+                darkMode
+                  ? "bg-gray-700 border-gray-600 text-gray-200"
+                  : "bg-gray-50 border-gray-200 text-gray-800"
+              } focus:outline-none focus:ring-2 focus:ring-purple-500`}
             />
           </div>
           <div className="mt-6 flex space-x-4">
@@ -204,7 +283,11 @@ const PurchasesPage = () => {
             placeholder={t.search}
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className={`flex-1 px-4 py-3 border rounded-lg ${darkMode ? 'bg-gray-700 border-gray-600 text-gray-200' : 'bg-gray-50 border-gray-200 text-gray-800'} focus:outline-none focus:ring-2 focus:ring-purple-500`}
+            className={`flex-1 px-4 py-3 border rounded-lg ${
+              darkMode
+                ? "bg-gray-700 border-gray-600 text-gray-200"
+                : "bg-gray-50 border-gray-200 text-gray-800"
+            } focus:outline-none focus:ring-2 focus:ring-purple-500`}
           />
           <button
             onClick={handleExport}
@@ -214,7 +297,12 @@ const PurchasesPage = () => {
           </button>
           <label className="bg-gradient-to-r from-blue-500 to-indigo-500 text-white px-6 py-3 rounded-lg hover:from-blue-600 hover:to-indigo-600 transition-all duration-200 cursor-pointer">
             {t.import}
-            <input type="file" accept=".xlsx, .xls" onChange={handleImport} className="hidden" />
+            <input
+              type="file"
+              accept=".xlsx, .xls"
+              onChange={handleImport}
+              className="hidden"
+            />
           </label>
         </div>
 
@@ -224,17 +312,32 @@ const PurchasesPage = () => {
             <table className="w-full border-collapse">
               <thead>
                 <tr className="bg-gray-100 dark:bg-gray-700">
-                  <th className="p-4 text-left text-gray-700 dark:text-gray-300">Supplier ID</th>
-                  <th className="p-4 text-left text-gray-700 dark:text-gray-300">Product ID</th>
-                  <th className="p-4 text-left text-gray-700 dark:text-gray-300">Quantity</th>
-                  <th className="p-4 text-left text-gray-700 dark:text-gray-300">Total Cost</th>
-                  <th className="p-4 text-left text-gray-700 dark:text-gray-300">Date</th>
-                  <th className="p-4 text-left text-gray-700 dark:text-gray-300">Actions</th>
+                  <th className="p-4 text-left text-gray-700 dark:text-gray-300">
+                    Supplier ID
+                  </th>
+                  <th className="p-4 text-left text-gray-700 dark:text-gray-300">
+                    Product ID
+                  </th>
+                  <th className="p-4 text-left text-gray-700 dark:text-gray-300">
+                    Quantity
+                  </th>
+                  <th className="p-4 text-left text-gray-700 dark:text-gray-300">
+                    Total Cost
+                  </th>
+                  <th className="p-4 text-left text-gray-700 dark:text-gray-300">
+                    Date
+                  </th>
+                  <th className="p-4 text-left text-gray-700 dark:text-gray-300">
+                    Actions
+                  </th>
                 </tr>
               </thead>
               <tbody>
                 {filteredPurchases.map((purchase) => (
-                  <tr key={purchase.id} className="border-b dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700 transition">
+                  <tr
+                    key={purchase.id}
+                    className="border-b dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700 transition"
+                  >
                     <td className="p-4">{purchase.supplierId}</td>
                     <td className="p-4">{purchase.productId}</td>
                     <td className="p-4">{purchase.quantity}</td>
@@ -262,7 +365,10 @@ const PurchasesPage = () => {
         </div>
 
         <div className="mt-8">
-          <Link href="/dashboard" className="text-purple-600 hover:underline font-medium">
+          <Link
+            href="/dashboard"
+            className="text-purple-600 hover:underline font-medium"
+          >
             {t.dashboard}
           </Link>
         </div>

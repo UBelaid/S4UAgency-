@@ -1,11 +1,13 @@
-import "../css/globals.css";
+import "../styles/globals.css";
+import { LanguageProvider } from "../context/LanguageContext";
 import type { AppProps } from "next/app";
-import { AppProvider } from "../context/LanguageContext";
 
-export default function MyApp({ Component, pageProps }: AppProps) {
+function MyApp({ Component, pageProps }: AppProps) {
   return (
-    <AppProvider>
+    <LanguageProvider>
       <Component {...pageProps} />
-    </AppProvider>
+    </LanguageProvider>
   );
 }
+
+export default MyApp;

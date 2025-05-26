@@ -1,12 +1,15 @@
-import { useState } from "react";
+import React, { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/router";
 import Layout from "../components/Layout";
-import { useAppContext, useTranslations } from "../context/LanguageContext";
+import {
+  useLanguageContext,
+  useTranslations,
+} from "../context/LanguageContext";
 
-const LoginPage = () => {
+const LoginPage: React.FC = () => {
   const router = useRouter();
-  const { darkMode } = useAppContext();
+  const { darkMode } = useLanguageContext();
   const t = useTranslations();
   const [formData, setFormData] = useState({
     email: "",

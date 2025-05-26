@@ -1,7 +1,10 @@
 import { useState, useEffect } from "react";
 import Link from "next/link";
 import Sidebar from "../components/Sidebar";
-import { useAppContext, useTranslations } from "../context/LanguageContext";
+import {
+  useLanguageContext,
+  useTranslations,
+} from "../context/LanguageContext";
 import * as XLSX from "xlsx";
 
 interface Supplier {
@@ -13,7 +16,7 @@ interface Supplier {
 }
 
 const SuppliersPage = () => {
-  const { darkMode } = useAppContext();
+  const { darkMode } = useLanguageContext();
   const t = useTranslations();
   const [suppliers, setSuppliers] = useState<Supplier[]>([
     {

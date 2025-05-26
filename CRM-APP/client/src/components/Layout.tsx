@@ -1,8 +1,8 @@
-import { useAppContext } from "../context/LanguageContext";
+import { useLanguageContext } from "../context/LanguageContext";
 
 const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const { darkMode, toggleDarkMode, language, toggleLanguage } =
-    useAppContext();
+    useLanguageContext();
 
   return (
     <div className="relative min-h-screen">

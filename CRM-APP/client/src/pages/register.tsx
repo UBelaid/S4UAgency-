@@ -1,10 +1,13 @@
-import { useState } from "react";
+import React, { useState } from "react";
 import Link from "next/link";
 import Layout from "../components/Layout";
-import { useAppContext, useTranslations } from "../context/LanguageContext";
+import {
+  useLanguageContext,
+  useTranslations,
+} from "../context/LanguageContext";
 
-const RegisterPage = () => {
-  const { darkMode } = useAppContext();
+const RegisterPage: React.FC = () => {
+  const { darkMode } = useLanguageContext();
   const t = useTranslations();
   const [formData, setFormData] = useState({
     username: "",
