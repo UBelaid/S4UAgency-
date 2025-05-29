@@ -1,277 +1,675 @@
-import { useState, useEffect } from "react";
-import Link from "next/link";
+"use client";
+
+import React, { useState, useRef } from "react";
 import Sidebar from "../components/Sidebar";
-import {  useLanguageContext, useTranslations } from "../context/LanguageContext";
+import {
+  useLanguageContext,
+  useTranslations,
+} from "../context/LanguageContext";
 import * as XLSX from "xlsx";
 
-interface Client {
+interface ClientData {
   id: number;
   name: string;
   email: string;
   phone: string;
+  address: string;
 }
 
-const ClientsPage = () => {
+const ClientsPage: React.FC = () => {
   const { darkMode } = useLanguageContext();
   const t = useTranslations();
-  const [clients, setClients] = useState<Client[]>([
-    {
-      id: 1,
-      name: "John Doe",
-      email: "john@example.com",
-      phone: "123-456-7890",
-    },
-    {
-      id: 2,
-      name: "Jane Smith",
-      email: "jane@example.com",
-      phone: "098-765-4321",
-    },
-  ]);
-  const [newClient, setNewClient] = useState({
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const [clients, setClients] = useState<ClientData[]>([]);
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isEditing, setIsEditing] = useState(false);
+  const [currentId, setCurrentId] = useState<number | null>(null);
+  const [formData, setFormData] = useState<ClientData>({
+    id: 0,
     name: "",
     email: "",
     phone: "",
+    address: "",
   });
-  const [editClient, setEditClient] = useState<Client | null>(null);
+  const [formErrors, setFormErrors] = useState<Partial<ClientData>>({});
+  const [importError, setImportError] = useState<string>("");
   const [searchQuery, setSearchQuery] = useState("");
-  const [filteredClients, setFilteredClients] = useState<Client[]>(clients);
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 5;
 
-  // Autosearch functionality
-  useEffect(() => {
-    const filtered = clients.filter(
-      (client) =>
-        client.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        client.email.toLowerCase().includes(searchQuery.toLowerCase())
+  const validateForm = (): boolean => {
+    const errors: Partial<ClientData> = {};
+    if (!formData.name.trim()) errors.name = `${t.name} ${t.isRequired}`;
+    if (!formData.email.trim()) errors.email = `${t.email} ${t.isRequired}`;
+    if (!formData.phone.trim()) errors.phone = `${t.phone} ${t.isRequired}`;
+    if (!formData.address.trim())
+      errors.address = `${t.address} ${t.isRequired}`;
+    setFormErrors(errors);
+    return Object.keys(errors).length === 0;
+  };
+
+  const resetForm = () => {
+    setIsModalOpen(false);
+    setIsEditing(false);
+    setFormData({ id: 0, name: "", email: "", phone: "", address: "" });
+    setFormErrors({});
+    setCurrentId(null);
+  };
+
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const { name, value } = e.target;
+    setFormData((prev) => ({ ...prev, [name]: value }));
+    if (value.trim()) setFormErrors((prev) => ({ ...prev, [name]: "" }));
+  };
+
+  const handleAdd = () => {
+    if (!validateForm()) return;
+    const newId = Math.max(0, ...clients.map((c) => c.id)) + 1;
+    setClients((prev) => [...prev, { ...formData, id: newId }]);
+    resetForm();
+  };
+
+  const handleEdit = (id: number) => {
+    const client = clients.find((c) => c.id === id);
+    if (client) {
+      setFormData(client);
+      setCurrentId(id);
+      setIsEditing(true);
+      setIsModalOpen(true);
+    }
+  };
+
+  const handleUpdate = () => {
+    if (!validateForm() || !currentId) return;
+    setClients((prev) =>
+      prev.map((c) => (c.id === currentId ? { ...formData, id: c.id } : c))
     );
-    setFilteredClients(filtered);
-  }, [searchQuery, clients]);
+    resetForm();
+  };
 
-  // Add client
-  const handleAddClient = () => {
-    if (newClient.name && newClient.email && newClient.phone) {
-      const newId = clients.length ? clients[clients.length - 1].id + 1 : 1;
-      setClients([...clients, { id: newId, ...newClient }]);
-      setNewClient({ name: "", email: "", phone: "" });
-    } else {
-      alert("Please fill all fields with valid data.");
+  const handleDelete = (id: number) => {
+    if (window.confirm(t.confirmDelete)) {
+      setClients((prev) => prev.filter((c) => c.id !== id));
+      // Fix pagination after deletion
+      const newClientCount = clients.length - 1;
+      const maxPage = Math.max(1, Math.ceil(newClientCount / itemsPerPage));
+      if (currentPage > maxPage) {
+        setCurrentPage(maxPage);
+      }
     }
   };
 
-  // Edit client
-  const handleEditClient = (client: Client) => {
-    setEditClient(client);
-  };
+  const handleExportToExcel = () => {
+    try {
+      // Clear any previous errors
+      setImportError("");
 
-  const handleUpdateClient = () => {
-    if (editClient) {
-      setClients(
-        clients.map((c) => (c.id === editClient.id ? { ...editClient } : c))
-      );
-      setEditClient(null);
+      // Prepare data for export
+      const exportData = clients.map((client) => ({
+        ID: client.id,
+        Name: client.name,
+        Email: client.email,
+        Phone: client.phone,
+        Address: client.address,
+      }));
+
+      // Create worksheet and workbook
+      const worksheet = XLSX.utils.json_to_sheet(exportData);
+      const workbook = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(workbook, worksheet, "Clients");
+
+      // Generate filename with timestamp
+      const timestamp = new Date()
+        .toISOString()
+        .slice(0, 19)
+        .replace(/:/g, "-");
+      const filename = `clients_export_${timestamp}.xlsx`;
+
+      // Write and download file
+      XLSX.writeFile(workbook, filename);
+
+      // Show success message (you might want to add a success state)
+      console.log("Export successful");
+    } catch (error) {
+      console.error("Export to Excel failed:", error);
+      setImportError("Export failed. Please try again.");
     }
   };
 
-  // Delete client
-  const handleDeleteClient = (id: number) => {
-    setClients(clients.filter((c) => c.id !== id));
-  };
-
-  // Export to Excel
-  const handleExport = () => {
-    const ws = XLSX.utils.json_to_sheet(clients);
-    const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, "Clients");
-    XLSX.writeFile(wb, "clients.xlsx");
-  };
-
-  // Import from Excel
-  const handleImport = (event: React.ChangeEvent<HTMLInputElement>) => {
+  const handleImportFromExcel = (
+    event: React.ChangeEvent<HTMLInputElement>
+  ) => {
     const file = event.target.files?.[0];
-    if (file) {
-      const reader = new FileReader();
-      reader.onload = (e) => {
-        const data = new Uint8Array(e.target?.result as ArrayBuffer);
+
+    // Reset error state
+    setImportError("");
+
+    if (!file) {
+      setImportError("No file selected");
+      return;
+    }
+
+    // Validate file type
+    const validExtensions = [".xlsx", ".xls"];
+    const fileExtension = file.name
+      .toLowerCase()
+      .substring(file.name.lastIndexOf("."));
+    if (!validExtensions.includes(fileExtension)) {
+      setImportError(
+        "Invalid file type. Please select an Excel file (.xlsx or .xls)"
+      );
+      if (fileInputRef.current) fileInputRef.current.value = "";
+      return;
+    }
+
+    const reader = new FileReader();
+
+    reader.onload = (e) => {
+      try {
+        const data = e.target?.result;
+        if (!data) {
+          throw new Error("No data read from file.");
+        }
+
+        // Read the workbook
         const workbook = XLSX.read(data, { type: "array" });
+
+        if (!workbook.SheetNames || workbook.SheetNames.length === 0) {
+          throw new Error("No sheets found in the workbook.");
+        }
+
         const sheetName = workbook.SheetNames[0];
         const worksheet = workbook.Sheets[sheetName];
-        const importedClients: Client[] = XLSX.utils.sheet_to_json(worksheet);
-        setClients([...clients, ...importedClients]);
-      };
-      reader.readAsArrayBuffer(file);
-    }
+
+        if (!worksheet) {
+          throw new Error("Could not read the worksheet.");
+        }
+
+        // Convert to JSON
+        const jsonData = XLSX.utils.sheet_to_json(worksheet, {
+          header: 1, // Use first row as header
+          defval: "", // Default value for empty cells
+        }) as (string | number | boolean | null)[][];
+
+        if (jsonData.length < 2) {
+          // At least header + 1 data row
+          setImportError(
+            "Excel file must contain at least one data row with headers."
+          );
+          if (fileInputRef.current) fileInputRef.current.value = "";
+          return;
+        }
+
+        // Get headers from first row
+        const headers = jsonData[0].map((h) => String(h).toLowerCase().trim());
+        const dataRows = jsonData.slice(1);
+
+        // Map headers to expected fields
+        const getColumnIndex = (possibleNames: string[]): number => {
+          for (const name of possibleNames) {
+            const index = headers.findIndex((h) =>
+              h.includes(name.toLowerCase())
+            );
+            if (index !== -1) return index;
+          }
+          return -1;
+        };
+
+        const nameIndex = getColumnIndex(["name", "nom", "nombre"]);
+        const emailIndex = getColumnIndex(["email", "e-mail", "mail"]);
+        const phoneIndex = getColumnIndex([
+          "phone",
+          "telephone",
+          "tel",
+          "téléphone",
+        ]);
+        const addressIndex = getColumnIndex([
+          "address",
+          "adresse",
+          "direccion",
+        ]);
+
+        if (
+          nameIndex === -1 ||
+          emailIndex === -1 ||
+          phoneIndex === -1 ||
+          addressIndex === -1
+        ) {
+          setImportError(
+            "Excel file must contain columns for Name, Email, Phone, and Address."
+          );
+          if (fileInputRef.current) fileInputRef.current.value = "";
+          return;
+        }
+
+        // Process data rows
+        const importedClients: ClientData[] = [];
+        const maxExistingId = Math.max(0, ...clients.map((c) => c.id));
+
+        dataRows.forEach((row) => {
+          const name = String(row[nameIndex] || "").trim();
+          const email = String(row[emailIndex] || "").trim();
+          const phone = String(row[phoneIndex] || "").trim();
+          const address = String(row[addressIndex] || "").trim();
+
+          // Only import rows with all required fields
+          if (name && email && phone && address) {
+            importedClients.push({
+              id: maxExistingId + importedClients.length + 1,
+              name,
+              email,
+              phone,
+              address,
+            });
+          }
+        });
+
+        if (importedClients.length === 0) {
+          setImportError("No valid client data found in the Excel file.");
+          if (fileInputRef.current) fileInputRef.current.value = "";
+          return;
+        }
+
+        // Add imported clients to existing ones
+        setClients((prev) => [...prev, ...importedClients]);
+
+        // Clear the file input
+        if (fileInputRef.current) fileInputRef.current.value = "";
+
+        // Show success (you might want to add a success message state)
+        console.log(`Successfully imported ${importedClients.length} clients`);
+      } catch (error) {
+        console.error("Import from Excel failed:", error);
+        setImportError(
+          "Failed to import Excel file. Please check the file format and try again."
+        );
+        if (fileInputRef.current) fileInputRef.current.value = "";
+      }
+    };
+
+    reader.onerror = () => {
+      setImportError("Failed to read the file. Please try again.");
+      if (fileInputRef.current) fileInputRef.current.value = "";
+    };
+
+    // Read the file as array buffer
+    reader.readAsArrayBuffer(file);
   };
 
-  return (
-    <div
-      className={`flex min-h-screen ${
-        darkMode ? "bg-gray-900 text-gray-200" : "bg-gray-50 text-gray-800"
-      }`}
-    >
-      <Sidebar />
-      <div className="flex-1 p-8">
-        <h2 className="text-4xl font-bold mb-8 text-gray-900 dark:text-white">
-          {t.clients}
-        </h2>
+  const filteredClients = clients.filter((client) =>
+    Object.values(client).some((value) =>
+      String(value).toLowerCase().includes(searchQuery.toLowerCase())
+    )
+  );
 
-        {/* Add Client Form */}
-        <div className="mb-8 p-6 rounded-xl shadow-lg bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700">
-          <h3 className="text-2xl font-semibold mb-6 text-gray-900 dark:text-white">
-            {editClient ? t.edit : t.add} {t.clients}
-          </h3>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            <input
-              type="text"
-              placeholder="Name"
-              value={editClient ? editClient.name : newClient.name}
-              onChange={(e) =>
-                editClient
-                  ? setEditClient({ ...editClient, name: e.target.value })
-                  : setNewClient({ ...newClient, name: e.target.value })
-              }
-              className={`px-4 py-3 border rounded-lg ${
-                darkMode
-                  ? "bg-gray-700 border-gray-600 text-gray-200"
-                  : "bg-gray-50 border-gray-200 text-gray-800"
-              } focus:outline-none focus:ring-2 focus:ring-purple-500`}
-            />
-            <input
-              type="email"
-              placeholder="Email"
-              value={editClient ? editClient.email : newClient.email}
-              onChange={(e) =>
-                editClient
-                  ? setEditClient({ ...editClient, email: e.target.value })
-                  : setNewClient({ ...newClient, email: e.target.value })
-              }
-              className={`px-4 py-3 border rounded-lg ${
-                darkMode
-                  ? "bg-gray-700 border-gray-600 text-gray-200"
-                  : "bg-gray-50 border-gray-200 text-gray-800"
-              } focus:outline-none focus:ring-2 focus:ring-purple-500`}
-            />
-            <input
-              type="text"
-              placeholder="Phone"
-              value={editClient ? editClient.phone : newClient.phone}
-              onChange={(e) =>
-                editClient
-                  ? setEditClient({ ...editClient, phone: e.target.value })
-                  : setNewClient({ ...newClient, phone: e.target.value })
-              }
-              className={`px-4 py-3 border rounded-lg ${
-                darkMode
-                  ? "bg-gray-700 border-gray-600 text-gray-200"
-                  : "bg-gray-50 border-gray-200 text-gray-800"
-              } focus:outline-none focus:ring-2 focus:ring-purple-500`}
-            />
-          </div>
-          <div className="mt-6 flex space-x-4">
-            <button
-              onClick={editClient ? handleUpdateClient : handleAddClient}
-              className="bg-gradient-to-r from-purple-500 to-pink-500 text-white px-6 py-3 rounded-lg hover:from-purple-600 hover:to-pink-600 transition-all duration-200"
-            >
-              {editClient ? t.update : t.add}
-            </button>
-            {editClient && (
-              <button
-                onClick={() => setEditClient(null)}
-                className="bg-gray-500 text-white px-6 py-3 rounded-lg hover:bg-gray-600 transition-all duration-200"
-              >
-                {t.cancel}
-              </button>
-            )}
-          </div>
+  const totalPages = Math.max(
+    1,
+    Math.ceil(filteredClients.length / itemsPerPage)
+  );
+  const paginatedClients = filteredClients.slice(
+    (currentPage - 1) * itemsPerPage,
+    currentPage * itemsPerPage
+  );
+
+  const handleNextPage = () =>
+    currentPage < totalPages && setCurrentPage((prev) => prev + 1);
+  const handlePreviousPage = () =>
+    currentPage > 1 && setCurrentPage((prev) => prev - 1);
+
+  return (
+    <div className="flex min-h-screen">
+      <Sidebar />
+      <div
+        className={`flex-1 p-8 ${
+          darkMode ? "bg-gray-900" : "bg-gray-100"
+        } transition-colors duration-200`}
+      >
+        <div className="mb-8 animate-fade-in">
+          <h1 className="text-4xl font-bold bg-gradient-to-r from-purple-500 to-pink-500 bg-clip-text text-transparent">
+            {t.clients}
+          </h1>
         </div>
 
-        {/* Search Bar */}
-        <div className="mb-8 flex space-x-4">
+        <div className="mb-6 flex justify-between items-center">
           <input
             type="text"
             placeholder={t.search}
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className={`flex-1 px-4 py-3 border rounded-lg ${
+            className={`w-1/3 px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 ${
               darkMode
-                ? "bg-gray-700 border-gray-600 text-gray-200"
-                : "bg-gray-50 border-gray-200 text-gray-800"
-            } focus:outline-none focus:ring-2 focus:ring-purple-500`}
+                ? "bg-gray-700 border-gray-600 text-gray-200 placeholder-gray-400"
+                : "bg-white border-gray-300 text-gray-800 placeholder-gray-500"
+            }`}
           />
-          <button
-            onClick={handleExport}
-            className="bg-gradient-to-r from-green-500 to-teal-500 text-white px-6 py-3 rounded-lg hover:from-green-600 hover:to-teal-600 transition-all duration-200"
-          >
-            {t.export}
-          </button>
-          <label className="bg-gradient-to-r from-blue-500 to-indigo-500 text-white px-6 py-3 rounded-lg hover:from-blue-600 hover:to-indigo-600 transition-all duration-200 cursor-pointer">
-            {t.import}
-            <input
-              type="file"
-              accept=".xlsx, .xls"
-              onChange={handleImport}
-              className="hidden"
-            />
-          </label>
+          <div className="space-x-4 flex items-center">
+            <button
+              onClick={() => {
+                setIsEditing(false);
+                resetForm();
+                setIsModalOpen(true);
+              }}
+              className="px-6 py-2 bg-gradient-to-r from-purple-500 to-pink-500 text-white rounded-lg hover:from-purple-600 hover:to-pink-600 transition-all shadow-md"
+            >
+              {t.add}
+            </button>
+            <button
+              onClick={handleExportToExcel}
+              className={`px-6 py-2 rounded-lg text-white font-semibold shadow-md transition-all duration-200 ${
+                darkMode
+                  ? "bg-gradient-to-r from-teal-600 to-blue-700 hover:from-teal-700 hover:to-blue-800"
+                  : "bg-gradient-to-r from-teal-500 to-blue-600 hover:from-teal-600 hover:to-blue-700"
+              }`}
+            >
+              {t.export}
+            </button>
+            <div className="relative">
+              <input
+                type="file"
+                ref={fileInputRef}
+                onChange={handleImportFromExcel}
+                accept=".xlsx,.xls"
+                className="absolute opacity-0 w-0 h-0"
+                id="importFile"
+              />
+              <label
+                htmlFor="importFile"
+                className={`px-6 py-2 rounded-lg text-white font-semibold cursor-pointer shadow-md transition-all duration-200 ${
+                  darkMode
+                    ? "bg-gradient-to-r from-green-600 to-teal-700 hover:from-green-700 hover:to-teal-800"
+                    : "bg-gradient-to-r from-green-500 to-teal-600 hover:from-green-600 hover:to-teal-700"
+                }`}
+              >
+                {t.import}
+              </label>
+            </div>
+          </div>
         </div>
 
-        {/* Clients Table */}
+        {importError && (
+          <div
+            className={`mb-4 p-3 rounded-lg ${
+              darkMode ? "bg-red-900 text-red-200" : "bg-red-100 text-red-700"
+            }`}
+          >
+            {importError}
+          </div>
+        )}
+
         <div className="overflow-x-auto">
-          <div className="bg-white dark:bg-gray-800 rounded-xl shadow-lg">
-            <table className="w-full border-collapse">
-              <thead>
-                <tr className="bg-gray-100 dark:bg-gray-700">
-                  <th className="p-4 text-left text-gray-700 dark:text-gray-300">
-                    Name
-                  </th>
-                  <th className="p-4 text-left text-gray-700 dark:text-gray-300">
-                    Email
-                  </th>
-                  <th className="p-4 text-left text-gray-700 dark:text-gray-300">
-                    Phone
-                  </th>
-                  <th className="p-4 text-left text-gray-700 dark:text-gray-300">
-                    Actions
-                  </th>
-                </tr>
-              </thead>
-              <tbody>
-                {filteredClients.map((client) => (
+          <table
+            className={`min-w-full rounded-lg shadow-lg ${
+              darkMode ? "bg-gray-800" : "bg-white"
+            }`}
+          >
+            <thead>
+              <tr className={darkMode ? "bg-gray-700" : "bg-gray-200"}>
+                <th
+                  className={`px-6 py-3 text-left text-sm font-medium ${
+                    darkMode ? "text-gray-200" : "text-gray-800"
+                  }`}
+                >
+                  {t.name}
+                </th>
+                <th
+                  className={`px-6 py-3 text-left text-sm font-medium ${
+                    darkMode ? "text-gray-200" : "text-gray-800"
+                  }`}
+                >
+                  {t.email}
+                </th>
+                <th
+                  className={`px-6 py-3 text-left text-sm font-medium ${
+                    darkMode ? "text-gray-200" : "text-gray-800"
+                  }`}
+                >
+                  {t.phone}
+                </th>
+                <th
+                  className={`px-6 py-3 text-left text-sm font-medium ${
+                    darkMode ? "text-gray-200" : "text-gray-800"
+                  }`}
+                >
+                  {t.address}
+                </th>
+                <th
+                  className={`px-6 py-3 text-left text-sm font-medium ${
+                    darkMode ? "text-gray-200" : "text-gray-800"
+                  }`}
+                >
+                  {t.actions}
+                </th>
+              </tr>
+            </thead>
+            <tbody>
+              {paginatedClients.length > 0 ? (
+                paginatedClients.map((client) => (
                   <tr
                     key={client.id}
-                    className="border-b dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700 transition"
+                    className={`border-t ${
+                      darkMode
+                        ? "border-gray-700 text-gray-200"
+                        : "border-gray-200 text-gray-800"
+                    } hover:${darkMode ? "bg-gray-700" : "bg-gray-50"}`}
                   >
-                    <td className="p-4">{client.name}</td>
-                    <td className="p-4">{client.email}</td>
-                    <td className="p-4">{client.phone}</td>
-                    <td className="p-4">
+                    <td className="px-6 py-4">{client.name}</td>
+                    <td className="px-6 py-4">{client.email}</td>
+                    <td className="px-6 py-4">{client.phone}</td>
+                    <td className="px-6 py-4">{client.address}</td>
+                    <td className="px-6 py-4 space-x-2">
                       <button
-                        onClick={() => handleEditClient(client)}
-                        className="text-blue-500 hover:underline mr-4"
+                        onClick={() => handleEdit(client.id)}
+                        className="px-4 py-1 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-all"
                       >
                         {t.edit}
                       </button>
                       <button
-                        onClick={() => handleDeleteClient(client.id)}
-                        className="text-red-500 hover:underline"
+                        onClick={() => handleDelete(client.id)}
+                        className="px-4 py-1 bg-red-500 text-white rounded-lg hover:bg-red-600 transition-all"
                       >
-                        Delete
+                        {t.delete}
                       </button>
                     </td>
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+                ))
+              ) : (
+                <tr>
+                  <td
+                    colSpan={5}
+                    className={`px-6 py-4 text-center ${
+                      darkMode ? "text-gray-200" : "text-gray-800"
+                    }`}
+                  >
+                    {t.noData}
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
         </div>
 
-        <div className="mt-8">
-          <Link
-            href="/dashboard"
-            className="text-purple-600 hover:underline font-medium"
+        <div className="mt-4 flex justify-between items-center">
+          <button
+            onClick={handlePreviousPage}
+            disabled={currentPage === 1}
+            className={`px-4 py-2 rounded-lg ${
+              darkMode
+                ? "bg-gray-700 text-gray-200"
+                : "bg-gray-200 text-gray-800"
+            } ${
+              currentPage === 1
+                ? "opacity-50 cursor-not-allowed"
+                : darkMode
+                ? "hover:bg-gray-600"
+                : "hover:bg-gray-300"
+            }`}
           >
-            {t.dashboard}
-          </Link>
+            {t.previous}
+          </button>
+          <span className={darkMode ? "text-gray-200" : "text-gray-800"}>
+            {t.page} {currentPage} {t.of} {totalPages}
+          </span>
+          <button
+            onClick={handleNextPage}
+            disabled={currentPage === totalPages}
+            className={`px-4 py-2 rounded-lg ${
+              darkMode
+                ? "bg-gray-700 text-gray-200"
+                : "bg-gray-200 text-gray-800"
+            } ${
+              currentPage === totalPages
+                ? "opacity-50 cursor-not-allowed"
+                : darkMode
+                ? "hover:bg-gray-600"
+                : "hover:bg-gray-300"
+            }`}
+          >
+            {t.next}
+          </button>
         </div>
+
+        {isModalOpen && (
+          <div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50 z-50">
+            <div
+              className={`p-8 rounded-xl shadow-lg w-full max-w-md ${
+                darkMode ? "bg-gray-800" : "bg-white"
+              }`}
+            >
+              <h2
+                className={`text-2xl font-bold mb-6 ${
+                  darkMode ? "text-gray-200" : "text-gray-800"
+                }`}
+              >
+                {isEditing ? t.update : t.add}
+              </h2>
+              <div className="space-y-6">
+                <div>
+                  <label
+                    className={`block text-sm font-medium ${
+                      darkMode ? "text-gray-300" : "text-gray-700"
+                    } mb-2`}
+                  >
+                    {t.name}
+                  </label>
+                  <input
+                    type="text"
+                    name="name"
+                    value={formData.name}
+                    onChange={handleInputChange}
+                    placeholder={t.name}
+                    className={`w-full px-4 py-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 ${
+                      darkMode
+                        ? "bg-gray-700 border-gray-600 text-gray-200 placeholder-gray-400"
+                        : "bg-gray-50 border-gray-200 text-gray-800 placeholder-gray-500"
+                    } ${formErrors.name ? "border-red-500" : ""}`}
+                  />
+                  {formErrors.name && (
+                    <p className="text-red-500 text-sm mt-1">
+                      {formErrors.name}
+                    </p>
+                  )}
+                </div>
+                <div>
+                  <label
+                    className={`block text-sm font-medium ${
+                      darkMode ? "text-gray-300" : "text-gray-700"
+                    } mb-2`}
+                  >
+                    {t.email}
+                  </label>
+                  <input
+                    type="email"
+                    name="email"
+                    value={formData.email}
+                    onChange={handleInputChange}
+                    placeholder={t.email}
+                    className={`w-full px-4 py-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 ${
+                      darkMode
+                        ? "bg-gray-700 border-gray-600 text-gray-200 placeholder-gray-400"
+                        : "bg-gray-50 border-gray-200 text-gray-800 placeholder-gray-500"
+                    } ${formErrors.email ? "border-red-500" : ""}`}
+                  />
+                  {formErrors.email && (
+                    <p className="text-red-500 text-sm mt-1">
+                      {formErrors.email}
+                    </p>
+                  )}
+                </div>
+                <div>
+                  <label
+                    className={`block text-sm font-medium ${
+                      darkMode ? "text-gray-300" : "text-gray-700"
+                    } mb-2`}
+                  >
+                    {t.phone}
+                  </label>
+                  <input
+                    type="text"
+                    name="phone"
+                    value={formData.phone}
+                    onChange={handleInputChange}
+                    placeholder={t.phone}
+                    className={`w-full px-4 py-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 ${
+                      darkMode
+                        ? "bg-gray-700 border-gray-600 text-gray-200 placeholder-gray-400"
+                        : "bg-gray-50 border-gray-200 text-gray-800 placeholder-gray-500"
+                    } ${formErrors.phone ? "border-red-500" : ""}`}
+                  />
+                  {formErrors.phone && (
+                    <p className="text-red-500 text-sm mt-1">
+                      {formErrors.phone}
+                    </p>
+                  )}
+                </div>
+                <div>
+                  <label
+                    className={`block text-sm font-medium ${
+                      darkMode ? "text-gray-300" : "text-gray-700"
+                    } mb-2`}
+                  >
+                    {t.address}
+                  </label>
+                  <input
+                    type="text"
+                    name="address"
+                    value={formData.address}
+                    onChange={handleInputChange}
+                    placeholder={t.address}
+                    className={`w-full px-4 py-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 ${
+                      darkMode
+                        ? "bg-gray-700 border-gray-600 text-gray-200 placeholder-gray-400"
+                        : "bg-gray-50 border-gray-200 text-gray-800 placeholder-gray-500"
+                    } ${formErrors.address ? "border-red-500" : ""}`}
+                  />
+                  {formErrors.address && (
+                    <p className="text-red-500 text-sm mt-1">
+                      {formErrors.address}
+                    </p>
+                  )}
+                </div>
+              </div>
+              <div className="mt-8 flex justify-end space-x-4">
+                <button
+                  onClick={resetForm}
+                  className={`px-6 py-2 border rounded-lg ${
+                    darkMode
+                      ? "border-gray-600 text-gray-200 hover:bg-gray-700"
+                      : "border-gray-300 text-gray-800 hover:bg-gray-200"
+                  } transition-all`}
+                >
+                  {t.cancel}
+                </button>
+                <button
+                  onClick={isEditing ? handleUpdate : handleAdd}
+                  className="px-6 py-2 bg-gradient-to-r from-purple-500 to-pink-500 text-white rounded-lg hover:from-purple-600 hover:to-pink-600 transition-all shadow-md"
+                >
+                  {isEditing ? t.update : t.add}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );

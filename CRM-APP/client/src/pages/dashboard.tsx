@@ -18,7 +18,7 @@ const DashboardPage: React.FC = () => {
     totalPurchases: 30,
   };
 
-  const currentDateTime = new Date()
+  const currentDateTime = new Date("2025-05-27T21:08:00+01:00")
     .toLocaleString(language === "fr" ? "fr-FR" : "en-US", {
       weekday: "long",
       year: "numeric",

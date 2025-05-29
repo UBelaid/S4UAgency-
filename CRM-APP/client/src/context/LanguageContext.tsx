@@ -55,6 +55,12 @@ const translations = {
     dontHaveAccount: "Don't have an account?",
     loginHere: "Login here",
     registerHere: "Register here",
+    previous: "Previous",
+    next: "Next",
+    page: "Page",
+    of: "of",
+    isRequired: "is required",
+    noData: "No clients found",
   },
   fr: {
     clients: "Clients",
@@ -99,6 +105,12 @@ const translations = {
     dontHaveAccount: "Vous n'avez pas de compte ?",
     loginHere: "Connectez-vous ici",
     registerHere: "Inscrivez-vous ici",
+    previous: "Précédent",
+    next: "Suivant",
+    page: "Page",
+    of: "de",
+    isRequired: "est requis",
+    noData: "Aucun client trouvé",
   },
 };
 
