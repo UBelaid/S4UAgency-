@@ -35,7 +35,7 @@ const LoginPage: React.FC = () => {
     <Layout>
       <div
         className={`min-h-screen flex items-center justify-center ${
-          darkMode ? "bg-gray-900" : "bg-gray-50"
+          darkMode ? "bg-gray-900 text-gray-200" : "bg-gray-50 text-gray-800"
         }`}
       >
         <div
@@ -45,15 +45,10 @@ const LoginPage: React.FC = () => {
               : "bg-white border-gray-200"
           }`}
         >
-          <h2
-            className="text-3xl font-bold mb-6 text-center"
-            style={{ color: darkMode ? "white" : "black" }}
-          >
-            {t.login}
-          </h2>
+          <h2 className="text-3xl font-bold mb-6 text-center">{t.login}</h2>
           <div className="space-y-6">
             <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+              <label className="block text-sm font-medium mb-2">
                 {t.email}
               </label>
               <input
@@ -61,16 +56,16 @@ const LoginPage: React.FC = () => {
                 name="email"
                 value={formData.email}
                 onChange={handleInputChange}
-                className={`w-full px-4 py-3 border rounded-lg ${
+                className={`w-full px-4 py-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 ${
                   darkMode
-                    ? "bg-gray-700 border-gray-600 text-gray-200"
-                    : "bg-gray-50 border-gray-200 text-gray-800"
-                } focus:outline-none focus:ring-2 focus:ring-purple-500`}
-                placeholder={t.email}
+                    ? "bg-gray-700 border-gray-600 text-gray-200 placeholder-gray-400"
+                    : "bg-gray-50 border-gray-200 text-gray-800 placeholder-gray-500"
+                }`}
+                placeholder={t.emailPlaceholder}
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+              <label className="block text-sm font-medium mb-2">
                 {t.password}
               </label>
               <div className="relative">
@@ -79,17 +74,18 @@ const LoginPage: React.FC = () => {
                   name="password"
                   value={formData.password}
                   onChange={handleInputChange}
-                  className={`w-full px-4 py-3 border rounded-lg ${
+                  className={`w-full px-4 py-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 ${
                     darkMode
-                      ? "bg-gray-700 border-gray-600 text-gray-200"
-                      : "bg-gray-50 border-gray-200 text-gray-800"
-                  } focus:outline-none focus:ring-2 focus:ring-purple-500`}
-                  placeholder={t.password}
+                      ? "bg-gray-700 border-gray-600 text-gray-200 placeholder-gray-400"
+                      : "bg-gray-50 border-gray-200 text-gray-800 placeholder-gray-500"
+                  }`}
+                  placeholder={t.passwordPlaceholder}
                 />
                 <button
                   type="button"
                   onClick={toggleShowPassword}
-                  className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-500 dark:text-gray-400"
+                  className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-300"
+                  aria-label={showPassword ? "Hide password" : "Show password"}
                 >
                   {showPassword ? "👁️‍🗨️" : "👁️"}
                 </button>
@@ -98,16 +94,17 @@ const LoginPage: React.FC = () => {
           </div>
           <button
             onClick={handleLogin}
-            className="w-full mt-8 bg-gradient-to-r from-purple-500 to-pink-500 text-white py-3 rounded-lg hover:from-purple-600 hover:to-pink-600 transition-all duration-200"
+            className="w-full mt-6 bg-gradient-to-r from-purple-500 to-pink-500 text-white py-3 rounded-lg hover:from-purple-600 hover:to-pink-600 transition-all duration-200 font-semibold"
           >
             {t.login}
           </button>
-          <p className="mt-4 text-center text-sm text-gray-600 dark:text-gray-400">
+          <p className="mt-4 text-center text-sm">
             {t.dontHaveAccount}{" "}
             <Link href="/register" className="text-purple-600 hover:underline">
               {t.registerHere}
             </Link>
           </p>
+          <div className="mt-4 w-full h-2 bg-gradient-to-r from-purple-500 to-pink-500 rounded-b-lg"></div>
         </div>
       </div>
     </Layout>

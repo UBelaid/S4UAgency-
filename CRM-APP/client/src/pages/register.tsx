@@ -44,7 +44,7 @@ const RegisterPage: React.FC = () => {
     <Layout>
       <div
         className={`min-h-screen flex items-center justify-center ${
-          darkMode ? "bg-gray-900" : "bg-gray-50"
+          darkMode ? "bg-gray-900 text-gray-200" : "bg-gray-50 text-gray-800"
         }`}
       >
         <div
@@ -54,15 +54,10 @@ const RegisterPage: React.FC = () => {
               : "bg-white border-gray-200"
           }`}
         >
-          <h2
-            className="text-3xl font-bold mb-6 text-center"
-            style={{ color: darkMode ? "white" : "black" }}
-          >
-            {t.register}
-          </h2>
+          <h2 className="text-3xl font-bold mb-6 text-center">{t.register}</h2>
           <div className="space-y-6">
             <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+              <label className="block text-sm font-medium mb-2">
                 {t.username}
               </label>
               <input
@@ -70,16 +65,16 @@ const RegisterPage: React.FC = () => {
                 name="username"
                 value={formData.username}
                 onChange={handleInputChange}
-                className={`w-full px-4 py-3 border rounded-lg ${
+                className={`w-full px-4 py-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 ${
                   darkMode
-                    ? "bg-gray-700 border-gray-600 text-gray-200"
-                    : "bg-gray-50 border-gray-200 text-gray-800"
-                } focus:outline-none focus:ring-2 focus:ring-purple-500`}
+                    ? "bg-gray-700 border-gray-600 text-gray-200 placeholder-gray-400"
+                    : "bg-gray-50 border-gray-200 text-gray-800 placeholder-gray-500"
+                }`}
                 placeholder={t.username}
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+              <label className="block text-sm font-medium mb-2">
                 {t.email}
               </label>
               <input
@@ -87,16 +82,16 @@ const RegisterPage: React.FC = () => {
                 name="email"
                 value={formData.email}
                 onChange={handleInputChange}
-                className={`w-full px-4 py-3 border rounded-lg ${
+                className={`w-full px-4 py-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 ${
                   darkMode
-                    ? "bg-gray-700 border-gray-600 text-gray-200"
-                    : "bg-gray-50 border-gray-200 text-gray-800"
-                } focus:outline-none focus:ring-2 focus:ring-purple-500`}
-                placeholder={t.email}
+                    ? "bg-gray-700 border-gray-600 text-gray-200 placeholder-gray-400"
+                    : "bg-gray-50 border-gray-200 text-gray-800 placeholder-gray-500"
+                }`}
+                placeholder={t.emailPlaceholder}
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+              <label className="block text-sm font-medium mb-2">
                 {t.password}
               </label>
               <div className="relative">
@@ -105,24 +100,25 @@ const RegisterPage: React.FC = () => {
                   name="password"
                   value={formData.password}
                   onChange={handleInputChange}
-                  className={`w-full px-4 py-3 border rounded-lg ${
+                  className={`w-full px-4 py-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 ${
                     darkMode
-                      ? "bg-gray-700 border-gray-600 text-gray-200"
-                      : "bg-gray-50 border-gray-200 text-gray-800"
-                  } focus:outline-none focus:ring-2 focus:ring-purple-500`}
-                  placeholder={t.password}
+                      ? "bg-gray-700 border-gray-600 text-gray-200 placeholder-gray-400"
+                      : "bg-gray-50 border-gray-200 text-gray-800 placeholder-gray-500"
+                  }`}
+                  placeholder={t.passwordPlaceholder}
                 />
                 <button
                   type="button"
                   onClick={toggleShowPassword}
-                  className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-500 dark:text-gray-400"
+                  className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-300"
+                  aria-label={showPassword ? "Hide password" : "Show password"}
                 >
                   {showPassword ? "👁️‍🗨️" : "👁️"}
                 </button>
               </div>
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+              <label className="block text-sm font-medium mb-2">
                 {t.confirmPassword}
               </label>
               <input
@@ -130,45 +126,44 @@ const RegisterPage: React.FC = () => {
                 name="confirmPassword"
                 value={formData.confirmPassword}
                 onChange={handleInputChange}
-                className={`w-full px-4 py-3 border rounded-lg ${
+                className={`w-full px-4 py-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 ${
                   darkMode
-                    ? "bg-gray-700 border-gray-600 text-gray-200"
-                    : "bg-gray-50 border-gray-200 text-gray-800"
-                } focus:outline-none focus:ring-2 focus:ring-purple-500`}
-                placeholder={t.confirmPassword}
+                    ? "bg-gray-700 border-gray-600 text-gray-200 placeholder-gray-400"
+                    : "bg-gray-50 border-gray-200 text-gray-800 placeholder-gray-500"
+                }`}
+                placeholder={t.passwordPlaceholder}
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                {t.pin}
-              </label>
+              <label className="block text-sm font-medium mb-2">{t.pin}</label>
               <input
                 type="text"
                 name="pin"
                 value={formData.pin}
                 onChange={handleInputChange}
-                className={`w-full px-4 py-3 border rounded-lg ${
+                className={`w-full px-4 py-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 ${
                   darkMode
-                    ? "bg-gray-700 border-gray-600 text-gray-200"
-                    : "bg-gray-50 border-gray-200 text-gray-800"
-                } focus:outline-none focus:ring-2 focus:ring-purple-500`}
+                    ? "bg-gray-700 border-gray-600 text-gray-200 placeholder-gray-400"
+                    : "bg-gray-50 border-gray-200 text-gray-800 placeholder-gray-500"
+                }`}
                 placeholder={t.pin}
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                {t.role}
-              </label>
+              <label className="block text-sm font-medium mb-2">{t.role}</label>
               <div className="flex space-x-4">
                 <button
                   type="button"
                   onClick={() => handleRoleChange("employee")}
-                  className={`flex-1 flex items-center justify-center p-4 rounded-lg border transition-all duration-200 ${
+                  className={`flex-1 flex items-center justify-center p-3 rounded-lg border transition-all duration-200 ${
                     formData.role === "employee"
                       ? "bg-gradient-to-r from-blue-500 to-indigo-500 text-white border-blue-500"
-                      : "border-gray-300 dark:border-gray-600 hover:bg-gray-100 dark:hover:bg-gray-700"
+                      : `${
+                          darkMode
+                            ? "border-gray-600 hover:bg-gray-700"
+                            : "border-gray-300 hover:bg-gray-100"
+                        }`
                   }`}
-                  style={{ color: darkMode ? "white" : "black" }}
                 >
                   <span className="mr-2">👤</span>
                   <span>{t.employee}</span>
@@ -176,12 +171,15 @@ const RegisterPage: React.FC = () => {
                 <button
                   type="button"
                   onClick={() => handleRoleChange("admin")}
-                  className={`flex-1 flex items-center justify-center p-4 rounded-lg border transition-all duration-200 ${
+                  className={`flex-1 flex items-center justify-center p-3 rounded-lg border transition-all duration-200 ${
                     formData.role === "admin"
                       ? "bg-gradient-to-r from-purple-500 to-pink-500 text-white border-purple-500"
-                      : "border-gray-300 dark:border-gray-600 hover:bg-gray-100 dark:hover:bg-gray-700"
+                      : `${
+                          darkMode
+                            ? "border-gray-600 hover:bg-gray-700"
+                            : "border-gray-300 hover:bg-gray-100"
+                        }`
                   }`}
-                  style={{ color: darkMode ? "white" : "black" }}
                 >
                   <span className="mr-2">🛠️</span>
                   <span>{t.admin}</span>
@@ -191,16 +189,17 @@ const RegisterPage: React.FC = () => {
           </div>
           <button
             onClick={handleRegister}
-            className="w-full mt-8 bg-gradient-to-r from-purple-500 to-pink-500 text-white py-3 rounded-lg hover:from-purple-600 hover:to-pink-600 transition-all duration-200"
+            className="w-full mt-6 bg-gradient-to-r from-purple-500 to-pink-500 text-white py-3 rounded-lg hover:from-purple-600 hover:to-pink-600 transition-all duration-200 font-semibold"
           >
             {t.register}
           </button>
-          <p className="mt-4 text-center text-sm text-gray-600 dark:text-gray-400">
+          <p className="mt-4 text-center text-sm">
             {t.alreadyHaveAccount}{" "}
             <Link href="/login" className="text-purple-600 hover:underline">
               {t.loginHere}
             </Link>
           </p>
+          <div className="mt-4 w-full h-2 bg-gradient-to-r from-purple-500 to-pink-500 rounded-b-lg"></div>
         </div>
       </div>
     </Layout>

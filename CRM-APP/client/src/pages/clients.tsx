@@ -91,21 +91,15 @@ const ClientsPage: React.FC = () => {
   const handleDelete = (id: number) => {
     if (window.confirm(t.confirmDelete)) {
       setClients((prev) => prev.filter((c) => c.id !== id));
-      // Fix pagination after deletion
       const newClientCount = clients.length - 1;
       const maxPage = Math.max(1, Math.ceil(newClientCount / itemsPerPage));
-      if (currentPage > maxPage) {
-        setCurrentPage(maxPage);
-      }
+      if (currentPage > maxPage) setCurrentPage(maxPage);
     }
   };
 
   const handleExportToExcel = () => {
     try {
-      // Clear any previous errors
       setImportError("");
-
-      // Prepare data for export
       const exportData = clients.map((client) => ({
         ID: client.id,
         Name: client.name,
@@ -113,23 +107,15 @@ const ClientsPage: React.FC = () => {
         Phone: client.phone,
         Address: client.address,
       }));
-
-      // Create worksheet and workbook
       const worksheet = XLSX.utils.json_to_sheet(exportData);
       const workbook = XLSX.utils.book_new();
       XLSX.utils.book_append_sheet(workbook, worksheet, "Clients");
-
-      // Generate filename with timestamp
       const timestamp = new Date()
         .toISOString()
         .slice(0, 19)
         .replace(/:/g, "-");
       const filename = `clients_export_${timestamp}.xlsx`;
-
-      // Write and download file
       XLSX.writeFile(workbook, filename);
-
-      // Show success message (you might want to add a success state)
       console.log("Export successful");
     } catch (error) {
       console.error("Export to Excel failed:", error);
@@ -141,16 +127,11 @@ const ClientsPage: React.FC = () => {
     event: React.ChangeEvent<HTMLInputElement>
   ) => {
     const file = event.target.files?.[0];
-
-    // Reset error state
     setImportError("");
-
     if (!file) {
       setImportError("No file selected");
       return;
     }
-
-    // Validate file type
     const validExtensions = [".xlsx", ".xls"];
     const fileExtension = file.name
       .toLowerCase()
@@ -162,74 +143,39 @@ const ClientsPage: React.FC = () => {
       if (fileInputRef.current) fileInputRef.current.value = "";
       return;
     }
-
     const reader = new FileReader();
-
     reader.onload = (e) => {
       try {
         const data = e.target?.result;
-        if (!data) {
-          throw new Error("No data read from file.");
-        }
-
-        // Read the workbook
+        if (!data) throw new Error("No data read from file.");
         const workbook = XLSX.read(data, { type: "array" });
-
-        if (!workbook.SheetNames || workbook.SheetNames.length === 0) {
-          throw new Error("No sheets found in the workbook.");
-        }
-
         const sheetName = workbook.SheetNames[0];
         const worksheet = workbook.Sheets[sheetName];
-
-        if (!worksheet) {
-          throw new Error("Could not read the worksheet.");
-        }
-
-        // Convert to JSON
+        if (!worksheet) throw new Error("Could not read the worksheet.");
         const jsonData = XLSX.utils.sheet_to_json(worksheet, {
-          header: 1, // Use first row as header
-          defval: "", // Default value for empty cells
+          header: 1,
+          defval: "",
         }) as (string | number | boolean | null)[][];
-
         if (jsonData.length < 2) {
-          // At least header + 1 data row
           setImportError(
             "Excel file must contain at least one data row with headers."
           );
           if (fileInputRef.current) fileInputRef.current.value = "";
           return;
         }
-
-        // Get headers from first row
         const headers = jsonData[0].map((h) => String(h).toLowerCase().trim());
         const dataRows = jsonData.slice(1);
-
-        // Map headers to expected fields
         const getColumnIndex = (possibleNames: string[]): number => {
           for (const name of possibleNames) {
-            const index = headers.findIndex((h) =>
-              h.includes(name.toLowerCase())
-            );
-            if (index !== -1) return index;
+            const idx = headers.findIndex((h) => h.includes(name.toLowerCase()));
+            if (idx !== -1) return idx;
           }
           return -1;
         };
-
-        const nameIndex = getColumnIndex(["name", "nom", "nombre"]);
-        const emailIndex = getColumnIndex(["email", "e-mail", "mail"]);
-        const phoneIndex = getColumnIndex([
-          "phone",
-          "telephone",
-          "tel",
-          "téléphone",
-        ]);
-        const addressIndex = getColumnIndex([
-          "address",
-          "adresse",
-          "direccion",
-        ]);
-
+        const nameIndex = getColumnIndex(["name", "nom"]);
+        const emailIndex = getColumnIndex(["email", "e-mail"]);
+        const phoneIndex = getColumnIndex(["phone", "telephone"]);
+        const addressIndex = getColumnIndex(["address", "adresse"]);
         if (
           nameIndex === -1 ||
           emailIndex === -1 ||
@@ -242,18 +188,13 @@ const ClientsPage: React.FC = () => {
           if (fileInputRef.current) fileInputRef.current.value = "";
           return;
         }
-
-        // Process data rows
         const importedClients: ClientData[] = [];
         const maxExistingId = Math.max(0, ...clients.map((c) => c.id));
-
         dataRows.forEach((row) => {
           const name = String(row[nameIndex] || "").trim();
           const email = String(row[emailIndex] || "").trim();
           const phone = String(row[phoneIndex] || "").trim();
           const address = String(row[addressIndex] || "").trim();
-
-          // Only import rows with all required fields
           if (name && email && phone && address) {
             importedClients.push({
               id: maxExistingId + importedClients.length + 1,
@@ -264,20 +205,13 @@ const ClientsPage: React.FC = () => {
             });
           }
         });
-
         if (importedClients.length === 0) {
           setImportError("No valid client data found in the Excel file.");
           if (fileInputRef.current) fileInputRef.current.value = "";
           return;
         }
-
-        // Add imported clients to existing ones
         setClients((prev) => [...prev, ...importedClients]);
-
-        // Clear the file input
         if (fileInputRef.current) fileInputRef.current.value = "";
-
-        // Show success (you might want to add a success message state)
         console.log(`Successfully imported ${importedClients.length} clients`);
       } catch (error) {
         console.error("Import from Excel failed:", error);
@@ -287,13 +221,10 @@ const ClientsPage: React.FC = () => {
         if (fileInputRef.current) fileInputRef.current.value = "";
       }
     };
-
     reader.onerror = () => {
       setImportError("Failed to read the file. Please try again.");
       if (fileInputRef.current) fileInputRef.current.value = "";
     };
-
-    // Read the file as array buffer
     reader.readAsArrayBuffer(file);
   };
 
@@ -302,7 +233,6 @@ const ClientsPage: React.FC = () => {
       String(value).toLowerCase().includes(searchQuery.toLowerCase())
     )
   );
-
   const totalPages = Math.max(
     1,
     Math.ceil(filteredClients.length / itemsPerPage)
@@ -330,7 +260,6 @@ const ClientsPage: React.FC = () => {
             {t.clients}
           </h1>
         </div>
-
         <div className="mb-6 flex justify-between items-center">
           <input
             type="text"
@@ -386,7 +315,6 @@ const ClientsPage: React.FC = () => {
             </div>
           </div>
         </div>
-
         {importError && (
           <div
             className={`mb-4 p-3 rounded-lg ${
@@ -396,7 +324,6 @@ const ClientsPage: React.FC = () => {
             {importError}
           </div>
         )}
-
         <div className="overflow-x-auto">
           <table
             className={`min-w-full rounded-lg shadow-lg ${
@@ -488,7 +415,6 @@ const ClientsPage: React.FC = () => {
             </tbody>
           </table>
         </div>
-
         <div className="mt-4 flex justify-between items-center">
           <button
             onClick={handlePreviousPage}
@@ -528,7 +454,6 @@ const ClientsPage: React.FC = () => {
             {t.next}
           </button>
         </div>
-
         {isModalOpen && (
           <div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50 z-50">
             <div

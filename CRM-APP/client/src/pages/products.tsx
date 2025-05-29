@@ -1,317 +1,672 @@
-import { useState, useEffect } from "react";
-import Link from "next/link";
+"use client";
+
+import React, { useState, useRef } from "react";
 import Sidebar from "../components/Sidebar";
-import { useLanguageContext, useTranslations } from "../context/LanguageContext";
+import {
+  useLanguageContext,
+  useTranslations,
+} from "../context/LanguageContext";
 import * as XLSX from "xlsx";
 
-interface Product {
+interface ProductData {
   id: number;
   name: string;
-  category: string;
+  description: string;
   price: number;
-  stock: number;
+  stockQuantity: number;
+  category: string;
 }
 
-const ProductsPage = () => {
+const ProductsPage: React.FC = () => {
   const { darkMode } = useLanguageContext();
   const t = useTranslations();
-  const [products, setProducts] = useState<Product[]>([
-    {
-      id: 1,
-      name: "Laptop",
-      category: "Electronics",
-      price: 999.99,
-      stock: 50,
-    },
-    {
-      id: 2,
-      name: "Headphones",
-      category: "Accessories",
-      price: 49.99,
-      stock: 200,
-    },
-  ]);
-  const [newProduct, setNewProduct] = useState({
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const [products, setProducts] = useState<ProductData[]>([]);
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isEditing, setIsEditing] = useState(false);
+  const [currentId, setCurrentId] = useState<number | null>(null);
+  const [formData, setFormData] = useState<ProductData>({
+    id: 0,
     name: "",
-    category: "",
+    description: "",
     price: 0,
-    stock: 0,
+    stockQuantity: 0,
+    category: "",
   });
-  const [editProduct, setEditProduct] = useState<Product | null>(null);
+  const [formErrors, setFormErrors] = useState<Partial<Record<keyof ProductData, string>>>({});
+  const [importError, setImportError] = useState<string>("");
   const [searchQuery, setSearchQuery] = useState("");
-  const [filteredProducts, setFilteredProducts] = useState<Product[]>(products);
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 5;
 
-  // Autosearch functionality
-  useEffect(() => {
-    const filtered = products.filter(
-      (product) =>
-        product.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        product.category.toLowerCase().includes(searchQuery.toLowerCase())
+  const validateForm = (): boolean => {
+    const errors: Partial<Record<keyof ProductData, string>> = {};
+    if (!formData.name.trim()) errors.name = `${t.productName} ${t.isRequired}`;
+    if (!formData.description.trim())
+      errors.description = `${t.description} ${t.isRequired}`;
+    if (formData.price <= 0) errors.price = `${t.price} ${t.mustBePositive}`;
+    if (formData.stockQuantity < 0)
+      errors.stockQuantity = `${t.stockQuantity} ${t.mustBeNonNegative}`;
+    if (!formData.category.trim())
+      errors.category = `${t.category} ${t.isRequired}`;
+    setFormErrors(errors);
+    return Object.keys(errors).length === 0;
+  };
+
+  const resetForm = () => {
+    setIsModalOpen(false);
+    setIsEditing(false);
+    setFormData({
+      id: 0,
+      name: "",
+      description: "",
+      price: 0,
+      stockQuantity: 0,
+      category: "",
+    });
+    setFormErrors({});
+    setCurrentId(null);
+  };
+
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const { name, value } = e.target;
+    setFormData((prev) => ({
+      ...prev,
+      [name]:
+        name === "price" || name === "stockQuantity"
+          ? Number(value) || 0
+          : value,
+    }));
+    if (value.trim() || name === "price" || name === "stockQuantity")
+      setFormErrors((prev) => ({ ...prev, [name]: "" }));
+  };
+
+  const handleAdd = () => {
+    if (!validateForm()) return;
+    const newId = Math.max(0, ...products.map((p) => p.id)) + 1;
+    setProducts((prev) => [...prev, { ...formData, id: newId }]);
+    resetForm();
+  };
+
+  const handleEdit = (id: number) => {
+    const product = products.find((p) => p.id === id);
+    if (product) {
+      setFormData(product);
+      setCurrentId(id);
+      setIsEditing(true);
+      setIsModalOpen(true);
+    }
+  };
+
+  const handleUpdate = () => {
+    if (!validateForm() || !currentId) return;
+    setProducts((prev) =>
+      prev.map((p) => (p.id === currentId ? { ...formData, id: p.id } : p))
     );
-    setFilteredProducts(filtered);
-  }, [searchQuery, products]);
+    resetForm();
+  };
 
-  // Add product
-  const handleAddProduct = () => {
-    if (
-      newProduct.name &&
-      newProduct.category &&
-      newProduct.price > 0 &&
-      newProduct.stock >= 0
-    ) {
-      const newId = products.length ? products[products.length - 1].id + 1 : 1;
-      setProducts([...products, { id: newId, ...newProduct }]);
-      setNewProduct({ name: "", category: "", price: 0, stock: 0 });
-    } else {
-      alert("Please fill all fields with valid data.");
+  const handleDelete = (id: number) => {
+    if (window.confirm(t.confirmDelete)) {
+      setProducts((prev) => prev.filter((p) => p.id !== id));
+      const newProductCount = products.length - 1;
+      const maxPage = Math.max(1, Math.ceil(newProductCount / itemsPerPage));
+      if (currentPage > maxPage) setCurrentPage(maxPage);
     }
   };
 
-  // Edit product
-  const handleEditProduct = (product: Product) => {
-    setEditProduct(product);
-  };
-
-  const handleUpdateProduct = () => {
-    if (editProduct) {
-      setProducts(
-        products.map((p) => (p.id === editProduct.id ? { ...editProduct } : p))
-      );
-      setEditProduct(null);
+  const handleExportToExcel = () => {
+    try {
+      setImportError("");
+      const exportData = products.map((product) => ({
+        ID: product.id,
+        Name: product.name,
+        Description: product.description,
+        Price: product.price,
+        StockQuantity: product.stockQuantity,
+        Category: product.category,
+      }));
+      const worksheet = XLSX.utils.json_to_sheet(exportData);
+      const workbook = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(workbook, worksheet, "Products");
+      const timestamp = new Date()
+        .toISOString()
+        .slice(0, 19)
+        .replace(/:/g, "-");
+      const filename = `products_export_${timestamp}.xlsx`;
+      XLSX.writeFile(workbook, filename);
+      console.log("Export successful");
+    } catch (error) {
+      console.error("Export to Excel failed:", error);
+      setImportError("Export failed. Please try again.");
     }
   };
 
-  // Delete product
-  const handleDeleteProduct = (id: number) => {
-    setProducts(products.filter((p) => p.id !== id));
-  };
-
-  // Export to Excel
-  const handleExport = () => {
-    const ws = XLSX.utils.json_to_sheet(products);
-    const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, "Products");
-    XLSX.writeFile(wb, "products.xlsx");
-  };
-
-  // Import from Excel
-  const handleImport = (event: React.ChangeEvent<HTMLInputElement>) => {
+  const handleImportFromExcel = (
+    event: React.ChangeEvent<HTMLInputElement>
+  ) => {
     const file = event.target.files?.[0];
-    if (file) {
-      const reader = new FileReader();
-      reader.onload = (e) => {
-        const data = new Uint8Array(e.target?.result as ArrayBuffer);
+    setImportError("");
+    if (!file) {
+      setImportError("No file selected");
+      return;
+    }
+    const validExtensions = [".xlsx", ".xls"];
+    const fileExtension = file.name
+      .toLowerCase()
+      .substring(file.name.lastIndexOf("."));
+    if (!validExtensions.includes(fileExtension)) {
+      setImportError(
+        "Invalid file type. Please select an Excel file (.xlsx or .xls)"
+      );
+      if (fileInputRef.current) fileInputRef.current.value = "";
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      try {
+        const data = e.target?.result;
+        if (!data) throw new Error("No data read from file.");
         const workbook = XLSX.read(data, { type: "array" });
         const sheetName = workbook.SheetNames[0];
         const worksheet = workbook.Sheets[sheetName];
-        const importedProducts: Product[] = XLSX.utils.sheet_to_json(worksheet);
-        setProducts([...products, ...importedProducts]);
-      };
-      reader.readAsArrayBuffer(file);
-    }
+        if (!worksheet) throw new Error("Could not read the worksheet.");
+        const jsonData = XLSX.utils.sheet_to_json(worksheet, {
+          header: 1,
+          defval: "",
+        }) as (string | number | boolean | null)[][];
+        if (jsonData.length < 2) {
+          setImportError(
+            "Excel file must contain at least one data row with headers."
+          );
+          if (fileInputRef.current) fileInputRef.current.value = "";
+          return;
+        }
+        const headers = jsonData[0].map((h) => String(h).toLowerCase().trim());
+        const dataRows = jsonData.slice(1);
+        const getColumnIndex = (possibleNames: string[]): number =>
+          possibleNames.findIndex((name) =>
+            headers.includes(name.toLowerCase())
+          ) !== -1
+            ? headers.findIndex((h) =>
+                possibleNames.some((name) => h.includes(name.toLowerCase()))
+              )
+            : -1;
+        const nameIndex = getColumnIndex(["name", "nom"]);
+        const descriptionIndex = getColumnIndex(["description", "desc"]);
+        const priceIndex = getColumnIndex(["price", "prix"]);
+        const stockQuantityIndex = getColumnIndex([
+          "stockquantity",
+          "quantity",
+        ]);
+        const categoryIndex = getColumnIndex(["category", "categorie"]);
+        if (
+          nameIndex === -1 ||
+          descriptionIndex === -1 ||
+          priceIndex === -1 ||
+          stockQuantityIndex === -1 ||
+          categoryIndex === -1
+        ) {
+          setImportError(
+            "Excel file must contain columns for Name, Description, Price, Stock Quantity, and Category."
+          );
+          if (fileInputRef.current) fileInputRef.current.value = "";
+          return;
+        }
+        const importedProducts: ProductData[] = [];
+        const maxExistingId = Math.max(0, ...products.map((p) => p.id));
+        dataRows.forEach((row) => {
+          const name = String(row[nameIndex] || "").trim();
+          const description = String(row[descriptionIndex] || "").trim();
+          const price = Number(row[priceIndex]) || 0;
+          const stockQuantity = Number(row[stockQuantityIndex]) || 0;
+          const category = String(row[categoryIndex] || "").trim();
+          if (
+            name &&
+            description &&
+            price > 0 &&
+            stockQuantity >= 0 &&
+            category
+          ) {
+            importedProducts.push({
+              id: maxExistingId + importedProducts.length + 1,
+              name,
+              description,
+              price,
+              stockQuantity,
+              category,
+            });
+          }
+        });
+        if (importedProducts.length === 0) {
+          setImportError("No valid product data found in the Excel file.");
+          if (fileInputRef.current) fileInputRef.current.value = "";
+          return;
+        }
+        setProducts((prev) => [...prev, ...importedProducts]);
+        if (fileInputRef.current) fileInputRef.current.value = "";
+        console.log(
+          `Successfully imported ${importedProducts.length} products`
+        );
+      } catch (error) {
+        console.error("Import from Excel failed:", error);
+        setImportError(
+          "Failed to import Excel file. Please check the file format and try again."
+        );
+        if (fileInputRef.current) fileInputRef.current.value = "";
+      }
+    };
+    reader.onerror = () => {
+      setImportError("Failed to read the file. Please try again.");
+      if (fileInputRef.current) fileInputRef.current.value = "";
+    };
+    reader.readAsArrayBuffer(file);
   };
 
+  const filteredProducts = products.filter((product) =>
+    Object.values(product).some((value) =>
+      String(value).toLowerCase().includes(searchQuery.toLowerCase())
+    )
+  );
+  const totalPages = Math.max(
+    1,
+    Math.ceil(filteredProducts.length / itemsPerPage)
+  );
+  const paginatedProducts = filteredProducts.slice(
+    (currentPage - 1) * itemsPerPage,
+    currentPage * itemsPerPage
+  );
+
+  const handleNextPage = () =>
+    currentPage < totalPages && setCurrentPage((prev) => prev + 1);
+  const handlePreviousPage = () =>
+    currentPage > 1 && setCurrentPage((prev) => prev - 1);
+
   return (
-    <div
-      className={`flex min-h-screen ${
-        darkMode ? "bg-gray-900 text-gray-200" : "bg-gray-50 text-gray-800"
-      }`}
-    >
+    <div className="flex min-h-screen">
       <Sidebar />
-      <div className="flex-1 p-8">
-        <h2 className="text-4xl font-bold mb-8 text-gray-900 dark:text-white">
-          {t.products}
-        </h2>
-
-        {/* Add Product Form */}
-        <div className="mb-8 p-6 rounded-xl shadow-lg bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700">
-          <h3 className="text-2xl font-semibold mb-6 text-gray-900 dark:text-white">
-            {editProduct ? t.edit : t.add} {t.products}
-          </h3>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <input
-              type="text"
-              placeholder="Product Name"
-              value={editProduct ? editProduct.name : newProduct.name}
-              onChange={(e) =>
-                editProduct
-                  ? setEditProduct({ ...editProduct, name: e.target.value })
-                  : setNewProduct({ ...newProduct, name: e.target.value })
-              }
-              className={`px-4 py-3 border rounded-lg ${
-                darkMode
-                  ? "bg-gray-700 border-gray-600 text-gray-200"
-                  : "bg-gray-50 border-gray-200 text-gray-800"
-              } focus:outline-none focus:ring-2 focus:ring-purple-500`}
-            />
-            <input
-              type="text"
-              placeholder="Category"
-              value={editProduct ? editProduct.category : newProduct.category}
-              onChange={(e) =>
-                editProduct
-                  ? setEditProduct({ ...editProduct, category: e.target.value })
-                  : setNewProduct({ ...newProduct, category: e.target.value })
-              }
-              className={`px-4 py-3 border rounded-lg ${
-                darkMode
-                  ? "bg-gray-700 border-gray-600 text-gray-200"
-                  : "bg-gray-50 border-gray-200 text-gray-800"
-              } focus:outline-none focus:ring-2 focus:ring-purple-500`}
-            />
-            <input
-              type="number"
-              placeholder="Price"
-              value={editProduct ? editProduct.price : newProduct.price}
-              onChange={(e) =>
-                editProduct
-                  ? setEditProduct({
-                      ...editProduct,
-                      price: parseFloat(e.target.value) || 0,
-                    })
-                  : setNewProduct({
-                      ...newProduct,
-                      price: parseFloat(e.target.value) || 0,
-                    })
-              }
-              className={`px-4 py-3 border rounded-lg ${
-                darkMode
-                  ? "bg-gray-700 border-gray-600 text-gray-200"
-                  : "bg-gray-50 border-gray-200 text-gray-800"
-              } focus:outline-none focus:ring-2 focus:ring-purple-500`}
-            />
-            <input
-              type="number"
-              placeholder="Stock"
-              value={editProduct ? editProduct.stock : newProduct.stock}
-              onChange={(e) =>
-                editProduct
-                  ? setEditProduct({
-                      ...editProduct,
-                      stock: parseInt(e.target.value) || 0,
-                    })
-                  : setNewProduct({
-                      ...newProduct,
-                      stock: parseInt(e.target.value) || 0,
-                    })
-              }
-              className={`px-4 py-3 border rounded-lg ${
-                darkMode
-                  ? "bg-gray-700 border-gray-600 text-gray-200"
-                  : "bg-gray-50 border-gray-200 text-gray-800"
-              } focus:outline-none focus:ring-2 focus:ring-purple-500`}
-            />
-          </div>
-          <div className="mt-6 flex space-x-4">
-            <button
-              onClick={editProduct ? handleUpdateProduct : handleAddProduct}
-              className="bg-gradient-to-r from-purple-500 to-pink-500 text-white px-6 py-3 rounded-lg hover:from-purple-600 hover:to-pink-600 transition-all duration-200"
-            >
-              {editProduct ? t.update : t.add}
-            </button>
-            {editProduct && (
-              <button
-                onClick={() => setEditProduct(null)}
-                className="bg-gray-500 text-white px-6 py-3 rounded-lg hover:bg-gray-600 transition-all duration-200"
-              >
-                {t.cancel}
-              </button>
-            )}
-          </div>
+      <div
+        className={`flex-1 p-8 ${
+          darkMode ? "bg-gray-900" : "bg-gray-100"
+        } transition-colors duration-200`}
+      >
+        <div className="mb-8 animate-fade-in">
+          <h1 className="text-4xl font-bold bg-gradient-to-r from-purple-500 to-pink-500 bg-clip-text text-transparent">
+            {t.products}
+          </h1>
         </div>
-
-        {/* Search Bar */}
-        <div className="mb-8 flex space-x-4">
+        <div className="mb-6 flex justify-between items-center">
           <input
             type="text"
             placeholder={t.search}
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className={`flex-1 px-4 py-3 border rounded-lg ${
+            className={`w-1/3 px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 ${
               darkMode
-                ? "bg-gray-700 border-gray-600 text-gray-200"
-                : "bg-gray-50 border-gray-200 text-gray-800"
-            } focus:outline-none focus:ring-2 focus:ring-purple-500`}
+                ? "bg-gray-700 border-gray-600 text-gray-200 placeholder-gray-400"
+                : "bg-white border-gray-300 text-gray-800 placeholder-gray-500"
+            }`}
           />
-          <button
-            onClick={handleExport}
-            className="bg-gradient-to-r from-green-500 to-teal-500 text-white px-6 py-3 rounded-lg hover:from-green-600 hover:to-teal-600 transition-all duration-200"
-          >
-            {t.export}
-          </button>
-          <label className="bg-gradient-to-r from-blue-500 to-indigo-500 text-white px-6 py-3 rounded-lg hover:from-blue-600 hover:to-indigo-600 transition-all duration-200 cursor-pointer">
-            {t.import}
-            <input
-              type="file"
-              accept=".xlsx, .xls"
-              onChange={handleImport}
-              className="hidden"
-            />
-          </label>
+          <div className="space-x-4 flex items-center">
+            <button
+              onClick={() => {
+                setIsEditing(false);
+                resetForm();
+                setIsModalOpen(true);
+              }}
+              className="px-6 py-2 bg-gradient-to-r from-purple-500 to-pink-500 text-white rounded-lg hover:from-purple-600 hover:to-pink-600 transition-all shadow-md"
+            >
+              {t.add}
+            </button>
+            <button
+              onClick={handleExportToExcel}
+              className={`px-6 py-2 rounded-lg text-white font-semibold shadow-md transition-all duration-200 ${
+                darkMode
+                  ? "bg-gradient-to-r from-teal-600 to-blue-700 hover:from-teal-700 hover:to-blue-800"
+                  : "bg-gradient-to-r from-teal-500 to-blue-600 hover:from-teal-600 hover:to-blue-700"
+              }`}
+            >
+              {t.export}
+            </button>
+            <div className="relative">
+              <input
+                type="file"
+                ref={fileInputRef}
+                onChange={handleImportFromExcel}
+                accept=".xlsx,.xls"
+                className="absolute opacity-0 w-0 h-0"
+                id="importFile"
+              />
+              <label
+                htmlFor="importFile"
+                className={`px-6 py-2 rounded-lg text-white font-semibold cursor-pointer shadow-md transition-all duration-200 ${
+                  darkMode
+                    ? "bg-gradient-to-r from-green-600 to-teal-700 hover:from-green-700 hover:to-teal-800"
+                    : "bg-gradient-to-r from-green-500 to-teal-600 hover:from-green-600 hover:to-teal-700"
+                }`}
+              >
+                {t.import}
+              </label>
+            </div>
+          </div>
         </div>
-
-        {/* Products Table */}
+        {importError && (
+          <div
+            className={`mb-4 p-3 rounded-lg ${
+              darkMode ? "bg-red-900 text-red-200" : "bg-red-100 text-red-700"
+            }`}
+          >
+            {importError}
+          </div>
+        )}
         <div className="overflow-x-auto">
-          <div className="bg-white dark:bg-gray-800 rounded-xl shadow-lg">
-            <table className="w-full border-collapse">
-              <thead>
-                <tr className="bg-gray-100 dark:bg-gray-700">
-                  <th className="p-4 text-left text-gray-700 dark:text-gray-300">
-                    Name
-                  </th>
-                  <th className="p-4 text-left text-gray-700 dark:text-gray-300">
-                    Category
-                  </th>
-                  <th className="p-4 text-left text-gray-700 dark:text-gray-300">
-                    Price
-                  </th>
-                  <th className="p-4 text-left text-gray-700 dark:text-gray-300">
-                    Stock
-                  </th>
-                  <th className="p-4 text-left text-gray-700 dark:text-gray-300">
-                    Actions
-                  </th>
-                </tr>
-              </thead>
-              <tbody>
-                {filteredProducts.map((product) => (
+          <table
+            className={`min-w-full rounded-lg shadow-lg ${
+              darkMode ? "bg-gray-800" : "bg-white"
+            }`}
+          >
+            <thead>
+              <tr className={darkMode ? "bg-gray-700" : "bg-gray-200"}>
+                <th
+                  className={`px-6 py-3 text-left text-sm font-medium ${
+                    darkMode ? "text-gray-200" : "text-gray-800"
+                  }`}
+                >
+                  {t.productName}
+                </th>
+                <th
+                  className={`px-6 py-3 text-left text-sm font-medium ${
+                    darkMode ? "text-gray-200" : "text-gray-800"
+                  }`}
+                >
+                  {t.description}
+                </th>
+                <th
+                  className={`px-6 py-3 text-left text-sm font-medium ${
+                    darkMode ? "text-gray-200" : "text-gray-800"
+                  }`}
+                >
+                  {t.price}
+                </th>
+                <th
+                  className={`px-6 py-3 text-left text-sm font-medium ${
+                    darkMode ? "text-gray-200" : "text-gray-800"
+                  }`}
+                >
+                  {t.stockQuantity}
+                </th>
+                <th
+                  className={`px-6 py-3 text-left text-sm font-medium ${
+                    darkMode ? "text-gray-200" : "text-gray-800"
+                  }`}
+                >
+                  {t.category}
+                </th>
+                <th
+                  className={`px-6 py-3 text-left text-sm font-medium ${
+                    darkMode ? "text-gray-200" : "text-gray-800"
+                  }`}
+                >
+                  {t.actions}
+                </th>
+              </tr>
+            </thead>
+            <tbody>
+              {paginatedProducts.length > 0 ? (
+                paginatedProducts.map((product) => (
                   <tr
                     key={product.id}
-                    className="border-b dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700 transition"
+                    className={`border-t ${
+                      darkMode
+                        ? "border-gray-700 text-gray-200"
+                        : "border-gray-200 text-gray-800"
+                    } hover:${darkMode ? "bg-gray-700" : "bg-gray-50"}`}
                   >
-                    <td className="p-4">{product.name}</td>
-                    <td className="p-4">{product.category}</td>
-                    <td className="p-4">${product.price.toFixed(2)}</td>
-                    <td className="p-4">{product.stock}</td>
-                    <td className="p-4">
+                    <td className="px-6 py-4">{product.name}</td>
+                    <td className="px-6 py-4">{product.description}</td>
+                    <td className="px-6 py-4">{product.price.toFixed(2)}</td>
+                    <td className="px-6 py-4">{product.stockQuantity}</td>
+                    <td className="px-6 py-4">{product.category}</td>
+                    <td className="px-6 py-4 space-x-2">
                       <button
-                        onClick={() => handleEditProduct(product)}
-                        className="text-blue-500 hover:underline mr-4"
+                        onClick={() => handleEdit(product.id)}
+                        className="px-4 py-1 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-all"
                       >
                         {t.edit}
                       </button>
                       <button
-                        onClick={() => handleDeleteProduct(product.id)}
-                        className="text-red-500 hover:underline"
+                        onClick={() => handleDelete(product.id)}
+                        className="px-4 py-1 bg-red-500 text-white rounded-lg hover:bg-red-600 transition-all"
                       >
-                        Delete
+                        {t.delete}
                       </button>
                     </td>
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+                ))
+              ) : (
+                <tr>
+                  <td
+                    colSpan={6}
+                    className={`px-6 py-4 text-center ${
+                      darkMode ? "text-gray-200" : "text-gray-800"
+                    }`}
+                  >
+                    {t.noData}
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
         </div>
-
-        <div className="mt-8">
-          <Link
-            href="/dashboard"
-            className="text-purple-600 hover:underline font-medium"
+        <div className="mt-4 flex justify-between items-center">
+          <button
+            onClick={handlePreviousPage}
+            disabled={currentPage === 1}
+            className={`px-4 py-2 rounded-lg ${
+              darkMode
+                ? "bg-gray-700 text-gray-200"
+                : "bg-gray-200 text-gray-800"
+            } ${
+              currentPage === 1
+                ? "opacity-50 cursor-not-allowed"
+                : darkMode
+                ? "hover:bg-gray-600"
+                : "hover:bg-gray-300"
+            }`}
           >
-            {t.dashboard}
-          </Link>
+            {t.previous}
+          </button>
+          <span className={darkMode ? "text-gray-200" : "text-gray-800"}>
+            {t.page} {currentPage} {t.of} {totalPages}
+          </span>
+          <button
+            onClick={handleNextPage}
+            disabled={currentPage === totalPages}
+            className={`px-4 py-2 rounded-lg ${
+              darkMode
+                ? "bg-gray-700 text-gray-200"
+                : "bg-gray-200 text-gray-800"
+            } ${
+              currentPage === totalPages
+                ? "opacity-50 cursor-not-allowed"
+                : darkMode
+                ? "hover:bg-gray-600"
+                : "hover:bg-gray-300"
+            }`}
+          >
+            {t.next}
+          </button>
         </div>
+        {isModalOpen && (
+          <div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50 z-50">
+            <div
+              className={`p-8 rounded-xl shadow-lg w-full max-w-md ${
+                darkMode ? "bg-gray-800" : "bg-white"
+              }`}
+            >
+              <h2
+                className={`text-2xl font-bold mb-6 ${
+                  darkMode ? "text-gray-200" : "text-gray-800"
+                }`}
+              >
+                {isEditing ? t.update : t.add}
+              </h2>
+              <div className="space-y-6">
+                <div>
+                  <label
+                    className={`block text-sm font-medium ${
+                      darkMode ? "text-gray-300" : "text-gray-700"
+                    } mb-2`}
+                  >
+                    {t.productName}
+                  </label>
+                  <input
+                    type="text"
+                    name="name"
+                    value={formData.name}
+                    onChange={handleInputChange}
+                    placeholder={t.productName}
+                    className={`w-full px-4 py-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 ${
+                      darkMode
+                        ? "bg-gray-700 border-gray-600 text-gray-200 placeholder-gray-400"
+                        : "bg-gray-50 border-gray-200 text-gray-800 placeholder-gray-500"
+                    } ${formErrors.name ? "border-red-500" : ""}`}
+                  />
+                  {formErrors.name && (
+                    <p className="text-red-500 text-sm mt-1">
+                      {formErrors.name}
+                    </p>
+                  )}
+                </div>
+                <div>
+                  <label
+                    className={`block text-sm font-medium ${
+                      darkMode ? "text-gray-300" : "text-gray-700"
+                    } mb-2`}
+                  >
+                    {t.description}
+                  </label>
+                  <input
+                    type="text"
+                    name="description"
+                    value={formData.description}
+                    onChange={handleInputChange}
+                    placeholder={t.description}
+                    className={`w-full px-4 py-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 ${
+                      darkMode
+                        ? "bg-gray-700 border-gray-600 text-gray-200 placeholder-gray-400"
+                        : "bg-gray-50 border-gray-200 text-gray-800 placeholder-gray-500"
+                    } ${formErrors.description ? "border-red-500" : ""}`}
+                  />
+                  {formErrors.description && (
+                    <p className="text-red-500 text-sm mt-1">
+                      {formErrors.description}
+                    </p>
+                  )}
+                </div>
+                <div>
+                  <label
+                    className={`block text-sm font-medium ${
+                      darkMode ? "text-gray-300" : "text-gray-700"
+                    } mb-2`}
+                  >
+                    {t.price}
+                  </label>
+                  <input
+                    type="number"
+                    name="price"
+                    value={formData.price || ""}
+                    onChange={handleInputChange}
+                    placeholder={t.price}
+                    className={`w-full px-4 py-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 ${
+                      darkMode
+                        ? "bg-gray-700 border-gray-600 text-gray-200 placeholder-gray-400"
+                        : "bg-gray-50 border-gray-200 text-gray-800 placeholder-gray-500"
+                    } ${formErrors.price ? "border-red-500" : ""}`}
+                    step="0.01"
+                  />
+                  {formErrors.price && (
+                    <p className="text-red-500 text-sm mt-1">
+                      {formErrors.price}
+                    </p>
+                  )}
+                </div>
+                <div>
+                  <label
+                    className={`block text-sm font-medium ${
+                      darkMode ? "text-gray-300" : "text-gray-700"
+                    } mb-2`}
+                  >
+                    {t.stockQuantity}
+                  </label>
+                  <input
+                    type="number"
+                    name="stockQuantity"
+                    value={formData.stockQuantity || ""}
+                    onChange={handleInputChange}
+                    placeholder={t.stockQuantity}
+                    className={`w-full px-4 py-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 ${
+                      darkMode
+                        ? "bg-gray-700 border-gray-600 text-gray-200 placeholder-gray-400"
+                        : "bg-gray-50 border-gray-200 text-gray-800 placeholder-gray-500"
+                    } ${formErrors.stockQuantity ? "border-red-500" : ""}`}
+                    step="1"
+                  />
+                  {formErrors.stockQuantity && (
+                    <p className="text-red-500 text-sm mt-1">
+                      {formErrors.stockQuantity}
+                    </p>
+                  )}
+                </div>
+                <div>
+                  <label
+                    className={`block text-sm font-medium ${
+                      darkMode ? "text-gray-300" : "text-gray-700"
+                    } mb-2`}
+                  >
+                    {t.category}
+                  </label>
+                  <input
+                    type="text"
+                    name="category"
+                    value={formData.category}
+                    onChange={handleInputChange}
+                    placeholder={t.category}
+                    className={`w-full px-4 py-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 ${
+                      darkMode
+                        ? "bg-gray-700 border-gray-600 text-gray-200 placeholder-gray-400"
+                        : "bg-gray-50 border-gray-200 text-gray-800 placeholder-gray-500"
+                    } ${formErrors.category ? "border-red-500" : ""}`}
+                  />
+                  {formErrors.category && (
+                    <p className="text-red-500 text-sm mt-1">
+                      {formErrors.category}
+                    </p>
+                  )}
+                </div>
+              </div>
+              <div className="mt-8 flex justify-end space-x-4">
+                <button
+                  onClick={resetForm}
+                  className={`px-6 py-2 border rounded-lg ${
+                    darkMode
+                      ? "border-gray-600 text-gray-200 hover:bg-gray-700"
+                      : "border-gray-300 text-gray-800 hover:bg-gray-200"
+                  } transition-all`}
+                >
+                  {t.cancel}
+                </button>
+                <button
+                  onClick={isEditing ? handleUpdate : handleAdd}
+                  className="px-6 py-2 bg-gradient-to-r from-purple-500 to-pink-500 text-white rounded-lg hover:from-purple-600 hover:to-pink-600 transition-all shadow-md"
+                >
+                  {isEditing ? t.update : t.add}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );
