@@ -1,603 +1,128 @@
-"use client";
-
-import React, { useState, useRef } from "react";
-import Sidebar from "../components/Sidebar";
+import React, { useState } from "react";
+import Link from "next/link";
+import { useRouter } from "next/router";
+import Layout from "../components/Layout";
 import {
   useLanguageContext,
   useTranslations,
 } from "../context/LanguageContext";
-import * as XLSX from "xlsx";
 
-interface ClientData {
-  id: number;
-  name: string;
-  email: string;
-  phone: string;
-  address: string;
-}
-
-const ClientsPage: React.FC = () => {
+const LoginPage: React.FC = () => {
+  const router = useRouter();
   const { darkMode } = useLanguageContext();
   const t = useTranslations();
-  const fileInputRef = useRef<HTMLInputElement>(null);
-
-  const [clients, setClients] = useState<ClientData[]>([]);
-  const [isModalOpen, setIsModalOpen] = useState(false);
-  const [isEditing, setIsEditing] = useState(false);
-  const [currentId, setCurrentId] = useState<number | null>(null);
-  const [formData, setFormData] = useState<ClientData>({
-    id: 0,
-    name: "",
-    email: "",
-    phone: "",
-    address: "",
+  const [formData, setFormData] = useState({
+    username: "",
+    password: "",
   });
-  const [formErrors, setFormErrors] = useState<Partial<ClientData>>({});
-  const [importError, setImportError] = useState<string>("");
-  const [searchQuery, setSearchQuery] = useState("");
-  const [currentPage, setCurrentPage] = useState(1);
-  const itemsPerPage = 5;
-
-  const validateForm = (): boolean => {
-    const errors: Partial<ClientData> = {};
-    if (!formData.name.trim()) errors.name = `${t.name} ${t.isRequired}`;
-    if (!formData.email.trim()) errors.email = `${t.email} ${t.isRequired}`;
-    if (!formData.phone.trim()) errors.phone = `${t.phone} ${t.isRequired}`;
-    if (!formData.address.trim())
-      errors.address = `${t.address} ${t.isRequired}`;
-    setFormErrors(errors);
-    return Object.keys(errors).length === 0;
-  };
-
-  const resetForm = () => {
-    setIsModalOpen(false);
-    setIsEditing(false);
-    setFormData({ id: 0, name: "", email: "", phone: "", address: "" });
-    setFormErrors({});
-    setCurrentId(null);
-  };
+  const [showPassword, setShowPassword] = useState(false);
+  const [error, setError] = useState("");
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
     setFormData((prev) => ({ ...prev, [name]: value }));
-    if (value.trim()) setFormErrors((prev) => ({ ...prev, [name]: "" }));
   };
 
-  const handleAdd = () => {
-    if (!validateForm()) return;
-    const newId = Math.max(0, ...clients.map((c) => c.id)) + 1;
-    setClients((prev) => [...prev, { ...formData, id: newId }]);
-    resetForm();
+  const toggleShowPassword = () => {
+    setShowPassword((prev) => !prev);
   };
 
-  const handleEdit = (id: number) => {
-    const client = clients.find((c) => c.id === id);
-    if (client) {
-      setFormData(client);
-      setCurrentId(id);
-      setIsEditing(true);
-      setIsModalOpen(true);
-    }
-  };
-
-  const handleUpdate = () => {
-    if (!validateForm() || !currentId) return;
-    setClients((prev) =>
-      prev.map((c) => (c.id === currentId ? { ...formData, id: c.id } : c))
-    );
-    resetForm();
-  };
-
-  const handleDelete = (id: number) => {
-    if (window.confirm(t.confirmDelete)) {
-      setClients((prev) => prev.filter((c) => c.id !== id));
-      const newClientCount = clients.length - 1;
-      const maxPage = Math.max(1, Math.ceil(newClientCount / itemsPerPage));
-      if (currentPage > maxPage) setCurrentPage(maxPage);
-    }
-  };
-
-  const handleExportToExcel = () => {
+  const handleLogin = async () => {
     try {
-      setImportError("");
-      const exportData = clients.map((client) => ({
-        ID: client.id,
-        Name: client.name,
-        Email: client.email,
-        Phone: client.phone,
-        Address: client.address,
-      }));
-      const worksheet = XLSX.utils.json_to_sheet(exportData);
-      const workbook = XLSX.utils.book_new();
-      XLSX.utils.book_append_sheet(workbook, worksheet, "Clients");
-      const timestamp = new Date()
-        .toISOString()
-        .slice(0, 19)
-        .replace(/:/g, "-");
-      const filename = `clients_export_${timestamp}.xlsx`;
-      XLSX.writeFile(workbook, filename);
-      console.log("Export successful");
-    } catch (error) {
-      console.error("Export to Excel failed:", error);
-      setImportError("Export failed. Please try again.");
-    }
-  };
-
-  const handleImportFromExcel = (
-    event: React.ChangeEvent<HTMLInputElement>
-  ) => {
-    const file = event.target.files?.[0];
-    setImportError("");
-    if (!file) {
-      setImportError("No file selected");
-      return;
-    }
-    const validExtensions = [".xlsx", ".xls"];
-    const fileExtension = file.name
-      .toLowerCase()
-      .substring(file.name.lastIndexOf("."));
-    if (!validExtensions.includes(fileExtension)) {
-      setImportError(
-        "Invalid file type. Please select an Excel file (.xlsx or .xls)"
-      );
-      if (fileInputRef.current) fileInputRef.current.value = "";
-      return;
-    }
-    const reader = new FileReader();
-    reader.onload = (e) => {
-      try {
-        const data = e.target?.result;
-        if (!data) throw new Error("No data read from file.");
-        const workbook = XLSX.read(data, { type: "array" });
-        const sheetName = workbook.SheetNames[0];
-        const worksheet = workbook.Sheets[sheetName];
-        if (!worksheet) throw new Error("Could not read the worksheet.");
-        const jsonData = XLSX.utils.sheet_to_json(worksheet, {
-          header: 1,
-          defval: "",
-        }) as (string | number | boolean | null)[][];
-        if (jsonData.length < 2) {
-          setImportError(
-            "Excel file must contain at least one data row with headers."
-          );
-          if (fileInputRef.current) fileInputRef.current.value = "";
-          return;
-        }
-        const headers = jsonData[0].map((h) => String(h).toLowerCase().trim());
-        const dataRows = jsonData.slice(1);
-        const getColumnIndex = (possibleNames: string[]): number => {
-          for (const name of possibleNames) {
-            const idx = headers.findIndex((h) => h.includes(name.toLowerCase()));
-            if (idx !== -1) return idx;
-          }
-          return -1;
-        };
-        const nameIndex = getColumnIndex(["name", "nom"]);
-        const emailIndex = getColumnIndex(["email", "e-mail"]);
-        const phoneIndex = getColumnIndex(["phone", "telephone"]);
-        const addressIndex = getColumnIndex(["address", "adresse"]);
-        if (
-          nameIndex === -1 ||
-          emailIndex === -1 ||
-          phoneIndex === -1 ||
-          addressIndex === -1
-        ) {
-          setImportError(
-            "Excel file must contain columns for Name, Email, Phone, and Address."
-          );
-          if (fileInputRef.current) fileInputRef.current.value = "";
-          return;
-        }
-        const importedClients: ClientData[] = [];
-        const maxExistingId = Math.max(0, ...clients.map((c) => c.id));
-        dataRows.forEach((row) => {
-          const name = String(row[nameIndex] || "").trim();
-          const email = String(row[emailIndex] || "").trim();
-          const phone = String(row[phoneIndex] || "").trim();
-          const address = String(row[addressIndex] || "").trim();
-          if (name && email && phone && address) {
-            importedClients.push({
-              id: maxExistingId + importedClients.length + 1,
-              name,
-              email,
-              phone,
-              address,
-            });
-          }
-        });
-        if (importedClients.length === 0) {
-          setImportError("No valid client data found in the Excel file.");
-          if (fileInputRef.current) fileInputRef.current.value = "";
-          return;
-        }
-        setClients((prev) => [...prev, ...importedClients]);
-        if (fileInputRef.current) fileInputRef.current.value = "";
-        console.log(`Successfully imported ${importedClients.length} clients`);
-      } catch (error) {
-        console.error("Import from Excel failed:", error);
-        setImportError(
-          "Failed to import Excel file. Please check the file format and try again."
-        );
-        if (fileInputRef.current) fileInputRef.current.value = "";
+      const response = await fetch("http://localhost:5000/api/auth/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(formData),
+      });
+      const data = await response.json();
+      if (response.ok) {
+        // Store JWT token and user data in localStorage
+        localStorage.setItem("token", data.token);
+        localStorage.setItem("user", JSON.stringify(data.user));
+        router.push("/dashboard");
+      } else {
+        setError(data.error || "Login failed");
       }
-    };
-    reader.onerror = () => {
-      setImportError("Failed to read the file. Please try again.");
-      if (fileInputRef.current) fileInputRef.current.value = "";
-    };
-    reader.readAsArrayBuffer(file);
+    } catch (error) {
+      setError("Error logging in");
+    }
   };
-
-  const filteredClients = clients.filter((client) =>
-    Object.values(client).some((value) =>
-      String(value).toLowerCase().includes(searchQuery.toLowerCase())
-    )
-  );
-  const totalPages = Math.max(
-    1,
-    Math.ceil(filteredClients.length / itemsPerPage)
-  );
-  const paginatedClients = filteredClients.slice(
-    (currentPage - 1) * itemsPerPage,
-    currentPage * itemsPerPage
-  );
-
-  const handleNextPage = () =>
-    currentPage < totalPages && setCurrentPage((prev) => prev + 1);
-  const handlePreviousPage = () =>
-    currentPage > 1 && setCurrentPage((prev) => prev - 1);
 
   return (
-    <div className="flex min-h-screen">
-      <Sidebar />
+    <Layout>
       <div
-        className={`flex-1 p-8 ${
-          darkMode ? "bg-gray-900" : "bg-gray-100"
-        } transition-colors duration-200`}
+        className={`min-h-screen flex items-center justify-center ${
+          darkMode ? "bg-gray-900 text-gray-200" : "bg-gray-50 text-gray-800"
+        }`}
       >
-        <div className="mb-8 animate-fade-in">
-          <h1 className="text-4xl font-bold bg-gradient-to-r from-purple-500 to-pink-500 bg-clip-text text-transparent">
-            {t.clients}
-          </h1>
-        </div>
-        <div className="mb-6 flex justify-between items-center">
-          <input
-            type="text"
-            placeholder={t.search}
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            className={`w-1/3 px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 ${
-              darkMode
-                ? "bg-gray-700 border-gray-600 text-gray-200 placeholder-gray-400"
-                : "bg-white border-gray-300 text-gray-800 placeholder-gray-500"
-            }`}
-          />
-          <div className="space-x-4 flex items-center">
-            <button
-              onClick={() => {
-                setIsEditing(false);
-                resetForm();
-                setIsModalOpen(true);
-              }}
-              className="px-6 py-2 bg-gradient-to-r from-purple-500 to-pink-500 text-white rounded-lg hover:from-purple-600 hover:to-pink-600 transition-all shadow-md"
-            >
-              {t.add}
-            </button>
-            <button
-              onClick={handleExportToExcel}
-              className={`px-6 py-2 rounded-lg text-white font-semibold shadow-md transition-all duration-200 ${
-                darkMode
-                  ? "bg-gradient-to-r from-teal-600 to-blue-700 hover:from-teal-700 hover:to-blue-800"
-                  : "bg-gradient-to-r from-teal-500 to-blue-600 hover:from-teal-600 hover:to-blue-700"
-              }`}
-            >
-              {t.export}
-            </button>
-            <div className="relative">
+        <div
+          className={`p-8 rounded-xl shadow-lg w-full max-w-md border ${
+            darkMode
+              ? "bg-gray-800 border-gray-700"
+              : "bg-white border-gray-200"
+          }`}
+        >
+          <h2 className="text-3xl font-bold mb-6 text-center">{t.login}</h2>
+          {error && <p className="text-red-500 text-center mb-4">{error}</p>}
+          <div className="space-y-6">
+            <div>
+              <label className="block text-sm font-medium mb-2">{t.username}</label>
               <input
-                type="file"
-                ref={fileInputRef}
-                onChange={handleImportFromExcel}
-                accept=".xlsx,.xls"
-                className="absolute opacity-0 w-0 h-0"
-                id="importFile"
-              />
-              <label
-                htmlFor="importFile"
-                className={`px-6 py-2 rounded-lg text-white font-semibold cursor-pointer shadow-md transition-all duration-200 ${
+                type="text"
+                name="username"
+                value={formData.username}
+                onChange={handleInputChange}
+                className={`w-full px-4 py-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 ${
                   darkMode
-                    ? "bg-gradient-to-r from-green-600 to-teal-700 hover:from-green-700 hover:to-teal-800"
-                    : "bg-gradient-to-r from-green-500 to-teal-600 hover:from-green-600 hover:to-teal-700"
+                    ? "bg-gray-700 border-gray-600 text-gray-200 placeholder-gray-400"
+                    : "bg-gray-50 border-gray-200 text-gray-800 placeholder-gray-500"
                 }`}
-              >
-                {t.import}
-              </label>
+                placeholder={t.username}
+              />
             </div>
-          </div>
-        </div>
-        {importError && (
-          <div
-            className={`mb-4 p-3 rounded-lg ${
-              darkMode ? "bg-red-900 text-red-200" : "bg-red-100 text-red-700"
-            }`}
-          >
-            {importError}
-          </div>
-        )}
-        <div className="overflow-x-auto">
-          <table
-            className={`min-w-full rounded-lg shadow-lg ${
-              darkMode ? "bg-gray-800" : "bg-white"
-            }`}
-          >
-            <thead>
-              <tr className={darkMode ? "bg-gray-700" : "bg-gray-200"}>
-                <th
-                  className={`px-6 py-3 text-left text-sm font-medium ${
-                    darkMode ? "text-gray-200" : "text-gray-800"
-                  }`}
-                >
-                  {t.name}
-                </th>
-                <th
-                  className={`px-6 py-3 text-left text-sm font-medium ${
-                    darkMode ? "text-gray-200" : "text-gray-800"
-                  }`}
-                >
-                  {t.email}
-                </th>
-                <th
-                  className={`px-6 py-3 text-left text-sm font-medium ${
-                    darkMode ? "text-gray-200" : "text-gray-800"
-                  }`}
-                >
-                  {t.phone}
-                </th>
-                <th
-                  className={`px-6 py-3 text-left text-sm font-medium ${
-                    darkMode ? "text-gray-200" : "text-gray-800"
-                  }`}
-                >
-                  {t.address}
-                </th>
-                <th
-                  className={`px-6 py-3 text-left text-sm font-medium ${
-                    darkMode ? "text-gray-200" : "text-gray-800"
-                  }`}
-                >
-                  {t.actions}
-                </th>
-              </tr>
-            </thead>
-            <tbody>
-              {paginatedClients.length > 0 ? (
-                paginatedClients.map((client) => (
-                  <tr
-                    key={client.id}
-                    className={`border-t ${
-                      darkMode
-                        ? "border-gray-700 text-gray-200"
-                        : "border-gray-200 text-gray-800"
-                    } hover:${darkMode ? "bg-gray-700" : "bg-gray-50"}`}
-                  >
-                    <td className="px-6 py-4">{client.name}</td>
-                    <td className="px-6 py-4">{client.email}</td>
-                    <td className="px-6 py-4">{client.phone}</td>
-                    <td className="px-6 py-4">{client.address}</td>
-                    <td className="px-6 py-4 space-x-2">
-                      <button
-                        onClick={() => handleEdit(client.id)}
-                        className="px-4 py-1 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-all"
-                      >
-                        {t.edit}
-                      </button>
-                      <button
-                        onClick={() => handleDelete(client.id)}
-                        className="px-4 py-1 bg-red-500 text-white rounded-lg hover:bg-red-600 transition-all"
-                      >
-                        {t.delete}
-                      </button>
-                    </td>
-                  </tr>
-                ))
-              ) : (
-                <tr>
-                  <td
-                    colSpan={5}
-                    className={`px-6 py-4 text-center ${
-                      darkMode ? "text-gray-200" : "text-gray-800"
-                    }`}
-                  >
-                    {t.noData}
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
-        </div>
-        <div className="mt-4 flex justify-between items-center">
-          <button
-            onClick={handlePreviousPage}
-            disabled={currentPage === 1}
-            className={`px-4 py-2 rounded-lg ${
-              darkMode
-                ? "bg-gray-700 text-gray-200"
-                : "bg-gray-200 text-gray-800"
-            } ${
-              currentPage === 1
-                ? "opacity-50 cursor-not-allowed"
-                : darkMode
-                ? "hover:bg-gray-600"
-                : "hover:bg-gray-300"
-            }`}
-          >
-            {t.previous}
-          </button>
-          <span className={darkMode ? "text-gray-200" : "text-gray-800"}>
-            {t.page} {currentPage} {t.of} {totalPages}
-          </span>
-          <button
-            onClick={handleNextPage}
-            disabled={currentPage === totalPages}
-            className={`px-4 py-2 rounded-lg ${
-              darkMode
-                ? "bg-gray-700 text-gray-200"
-                : "bg-gray-200 text-gray-800"
-            } ${
-              currentPage === totalPages
-                ? "opacity-50 cursor-not-allowed"
-                : darkMode
-                ? "hover:bg-gray-600"
-                : "hover:bg-gray-300"
-            }`}
-          >
-            {t.next}
-          </button>
-        </div>
-        {isModalOpen && (
-          <div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50 z-50">
-            <div
-              className={`p-8 rounded-xl shadow-lg w-full max-w-md ${
-                darkMode ? "bg-gray-800" : "bg-white"
-              }`}
-            >
-              <h2
-                className={`text-2xl font-bold mb-6 ${
-                  darkMode ? "text-gray-200" : "text-gray-800"
-                }`}
-              >
-                {isEditing ? t.update : t.add}
-              </h2>
-              <div className="space-y-6">
-                <div>
-                  <label
-                    className={`block text-sm font-medium ${
-                      darkMode ? "text-gray-300" : "text-gray-700"
-                    } mb-2`}
-                  >
-                    {t.name}
-                  </label>
-                  <input
-                    type="text"
-                    name="name"
-                    value={formData.name}
-                    onChange={handleInputChange}
-                    placeholder={t.name}
-                    className={`w-full px-4 py-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 ${
-                      darkMode
-                        ? "bg-gray-700 border-gray-600 text-gray-200 placeholder-gray-400"
-                        : "bg-gray-50 border-gray-200 text-gray-800 placeholder-gray-500"
-                    } ${formErrors.name ? "border-red-500" : ""}`}
-                  />
-                  {formErrors.name && (
-                    <p className="text-red-500 text-sm mt-1">
-                      {formErrors.name}
-                    </p>
-                  )}
-                </div>
-                <div>
-                  <label
-                    className={`block text-sm font-medium ${
-                      darkMode ? "text-gray-300" : "text-gray-700"
-                    } mb-2`}
-                  >
-                    {t.email}
-                  </label>
-                  <input
-                    type="email"
-                    name="email"
-                    value={formData.email}
-                    onChange={handleInputChange}
-                    placeholder={t.email}
-                    className={`w-full px-4 py-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 ${
-                      darkMode
-                        ? "bg-gray-700 border-gray-600 text-gray-200 placeholder-gray-400"
-                        : "bg-gray-50 border-gray-200 text-gray-800 placeholder-gray-500"
-                    } ${formErrors.email ? "border-red-500" : ""}`}
-                  />
-                  {formErrors.email && (
-                    <p className="text-red-500 text-sm mt-1">
-                      {formErrors.email}
-                    </p>
-                  )}
-                </div>
-                <div>
-                  <label
-                    className={`block text-sm font-medium ${
-                      darkMode ? "text-gray-300" : "text-gray-700"
-                    } mb-2`}
-                  >
-                    {t.phone}
-                  </label>
-                  <input
-                    type="text"
-                    name="phone"
-                    value={formData.phone}
-                    onChange={handleInputChange}
-                    placeholder={t.phone}
-                    className={`w-full px-4 py-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 ${
-                      darkMode
-                        ? "bg-gray-700 border-gray-600 text-gray-200 placeholder-gray-400"
-                        : "bg-gray-50 border-gray-200 text-gray-800 placeholder-gray-500"
-                    } ${formErrors.phone ? "border-red-500" : ""}`}
-                  />
-                  {formErrors.phone && (
-                    <p className="text-red-500 text-sm mt-1">
-                      {formErrors.phone}
-                    </p>
-                  )}
-                </div>
-                <div>
-                  <label
-                    className={`block text-sm font-medium ${
-                      darkMode ? "text-gray-300" : "text-gray-700"
-                    } mb-2`}
-                  >
-                    {t.address}
-                  </label>
-                  <input
-                    type="text"
-                    name="address"
-                    value={formData.address}
-                    onChange={handleInputChange}
-                    placeholder={t.address}
-                    className={`w-full px-4 py-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 ${
-                      darkMode
-                        ? "bg-gray-700 border-gray-600 text-gray-200 placeholder-gray-400"
-                        : "bg-gray-50 border-gray-200 text-gray-800 placeholder-gray-500"
-                    } ${formErrors.address ? "border-red-500" : ""}`}
-                  />
-                  {formErrors.address && (
-                    <p className="text-red-500 text-sm mt-1">
-                      {formErrors.address}
-                    </p>
-                  )}
-                </div>
-              </div>
-              <div className="mt-8 flex justify-end space-x-4">
-                <button
-                  onClick={resetForm}
-                  className={`px-6 py-2 border rounded-lg ${
+            <div>
+              <label className="block text-sm font-medium mb-2">{t.password}</label>
+              <div className="relative">
+                <input
+                  type={showPassword ? "text" : "password"}
+                  name="password"
+                  value={formData.password}
+                  onChange={handleInputChange}
+                  className={`w-full px-4 py-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 ${
                     darkMode
-                      ? "border-gray-600 text-gray-200 hover:bg-gray-700"
-                      : "border-gray-300 text-gray-800 hover:bg-gray-200"
-                  } transition-all`}
-                >
-                  {t.cancel}
-                </button>
+                      ? "bg-gray-700 border-gray-600 text-gray-200 placeholder-gray-400"
+                      : "bg-gray-50 border-gray-200 text-gray-800 placeholder-gray-500"
+                  }`}
+                  placeholder={t.passwordPlaceholder}
+                />
                 <button
-                  onClick={isEditing ? handleUpdate : handleAdd}
-                  className="px-6 py-2 bg-gradient-to-r from-purple-500 to-pink-500 text-white rounded-lg hover:from-purple-600 hover:to-pink-600 transition-all shadow-md"
+                  type="button"
+                  onClick={toggleShowPassword}
+                  className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-300"
+                  aria-label={showPassword ? "Hide password" : "Show password"}
                 >
-                  {isEditing ? t.update : t.add}
+                  {showPassword ? "👁️‍🗨️" : "👁️"}
                 </button>
               </div>
             </div>
           </div>
-        )}
+          <button
+            onClick={handleLogin}
+            className="w-full mt-6 bg-gradient-to-r from-purple-500 to-pink-500 text-white py-3 rounded-lg hover:from-purple-600 hover:to-pink-600 transition-all duration-200 font-semibold"
+          >
+            {t.login}
+          </button>
+          <p className="mt-4 text-center text-sm">
+            {t.dontHaveAccount}{" "}
+            <Link href="/register" className="text-purple-600 hover:underline">
+              {t.registerHere}
+            </Link>
+          </p>
+          <div className="mt-4 w-full h-2 bg-gradient-to-r from-purple-500 to-pink-500 rounded-b-lg"></div>
+        </div>
       </div>
-    </div>
+    </Layout>
   );
 };
 
-export default ClientsPage;
+export default LoginPage;

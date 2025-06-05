@@ -18,6 +18,7 @@ const RegisterPage: React.FC = () => {
     role: "employee",
   });
   const [showPassword, setShowPassword] = useState(false);
+  const [error, setError] = useState("");
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
@@ -32,12 +33,33 @@ const RegisterPage: React.FC = () => {
     setShowPassword((prev) => !prev);
   };
 
-  const handleRegister = () => {
+  const handleRegister = async () => {
     if (formData.password !== formData.confirmPassword) {
-      alert("Passwords do not match!");
+      setError("Passwords do not match!");
       return;
     }
-    console.log("Registering with:", formData);
+    try {
+      const response = await fetch("http://localhost:5000/api/auth/register", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          username: formData.username,
+          email: formData.email,
+          password: formData.password,
+          pin: formData.pin,
+          role: formData.role,
+        }),
+      });
+      const data = await response.json();
+      if (response.ok) {
+        alert("Registration successful! Please login.");
+        window.location.href = "/login";
+      } else {
+        setError(data.error || "Registration failed");
+      }
+    } catch (error) {
+      setError("Error registering user");
+    }
   };
 
   return (
@@ -55,11 +77,10 @@ const RegisterPage: React.FC = () => {
           }`}
         >
           <h2 className="text-3xl font-bold mb-6 text-center">{t.register}</h2>
+          {error && <p className="text-red-500 text-center mb-4">{error}</p>}
           <div className="space-y-6">
             <div>
-              <label className="block text-sm font-medium mb-2">
-                {t.username}
-              </label>
+              <label className="block text-sm font-medium mb-2">{t.username}</label>
               <input
                 type="text"
                 name="username"
@@ -74,9 +95,7 @@ const RegisterPage: React.FC = () => {
               />
             </div>
             <div>
-              <label className="block text-sm font-medium mb-2">
-                {t.email}
-              </label>
+              <label className="block text-sm font-medium mb-2">{t.email}</label>
               <input
                 type="email"
                 name="email"
@@ -91,9 +110,7 @@ const RegisterPage: React.FC = () => {
               />
             </div>
             <div>
-              <label className="block text-sm font-medium mb-2">
-                {t.password}
-              </label>
+              <label className="block text-sm font-medium mb-2">{t.password}</label>
               <div className="relative">
                 <input
                   type={showPassword ? "text" : "password"}
@@ -118,9 +135,7 @@ const RegisterPage: React.FC = () => {
               </div>
             </div>
             <div>
-              <label className="block text-sm font-medium mb-2">
-                {t.confirmPassword}
-              </label>
+              <label className="block text-sm font-medium mb-2">{t.confirmPassword}</label>
               <input
                 type="password"
                 name="confirmPassword"
@@ -158,11 +173,7 @@ const RegisterPage: React.FC = () => {
                   className={`flex-1 flex items-center justify-center p-3 rounded-lg border transition-all duration-200 ${
                     formData.role === "employee"
                       ? "bg-gradient-to-r from-blue-500 to-indigo-500 text-white border-blue-500"
-                      : `${
-                          darkMode
-                            ? "border-gray-600 hover:bg-gray-700"
-                            : "border-gray-300 hover:bg-gray-100"
-                        }`
+                      : `${darkMode ? "border-gray-600 hover:bg-gray-700" : "border-gray-300 hover:bg-gray-100"}`
                   }`}
                 >
                   <span className="mr-2">👤</span>
@@ -174,11 +185,7 @@ const RegisterPage: React.FC = () => {
                   className={`flex-1 flex items-center justify-center p-3 rounded-lg border transition-all duration-200 ${
                     formData.role === "admin"
                       ? "bg-gradient-to-r from-purple-500 to-pink-500 text-white border-purple-500"
-                      : `${
-                          darkMode
-                            ? "border-gray-600 hover:bg-gray-700"
-                            : "border-gray-300 hover:bg-gray-100"
-                        }`
+                      : `${darkMode ? "border-gray-600 hover:bg-gray-700" : "border-gray-300 hover:bg-gray-100"}`
                   }`}
                 >
                   <span className="mr-2">🛠️</span>
