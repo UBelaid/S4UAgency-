@@ -8,12 +8,17 @@ const Purchases = () => {
     supplier_id: "",
     quantity: "",
     purchase_date: "",
+    price: "",
   });
+  const [products, setProducts] = useState([]);
+  const [suppliers, setSuppliers] = useState([]);
   const [editingId, setEditingId] = useState(null);
   const [error, setError] = useState("");
 
   useEffect(() => {
     fetchPurchases();
+    fetchProducts();
+    fetchSuppliers();
   }, []);
 
   const fetchPurchases = async () => {
@@ -29,6 +34,44 @@ const Purchases = () => {
           (err.response?.data?.error || err.message)
       );
       console.error("Fetch purchases error:", err);
+    }
+  };
+
+  const fetchProducts = async () => {
+    try {
+      const token = localStorage.getItem("token");
+      const res = await axios.get(
+        "http://localhost:5000/api/purchases/products",
+        {
+          headers: { Authorization: `Bearer ${token}` },
+        }
+      );
+      setProducts(res.data);
+    } catch (err) {
+      setError(
+        "Failed to fetch products: " +
+          (err.response?.data?.error || err.message)
+      );
+      console.error("Fetch products error:", err);
+    }
+  };
+
+  const fetchSuppliers = async () => {
+    try {
+      const token = localStorage.getItem("token");
+      const res = await axios.get(
+        "http://localhost:5000/api/purchases/suppliers",
+        {
+          headers: { Authorization: `Bearer ${token}` },
+        }
+      );
+      setSuppliers(res.data);
+    } catch (err) {
+      setError(
+        "Failed to fetch suppliers: " +
+          (err.response?.data?.error || err.message)
+      );
+      console.error("Fetch suppliers error:", err);
     }
   };
 
@@ -49,6 +92,7 @@ const Purchases = () => {
         {
           ...formData,
           quantity: parseInt(formData.quantity),
+          price: parseFloat(formData.price),
         },
         {
           headers: { Authorization: `Bearer ${token}` },
@@ -60,6 +104,7 @@ const Purchases = () => {
         supplier_id: "",
         quantity: "",
         purchase_date: "",
+        price: "",
       });
       setEditingId(null);
     } catch (err) {
@@ -76,6 +121,7 @@ const Purchases = () => {
       supplier_id: purchase.supplier_id,
       quantity: purchase.quantity,
       purchase_date: purchase.purchase_date,
+      price: purchase.price,
     });
     setEditingId(purchase.id);
   };
@@ -103,26 +149,36 @@ const Purchases = () => {
       <form onSubmit={handleSubmit} className="mb-4">
         <div className="row g-2">
           <div className="col-md-3">
-            <input
-              type="number"
+            <select
               name="product_id"
               className="form-control"
-              placeholder="Product ID"
               value={formData.product_id}
               onChange={handleChange}
               required
-            />
+            >
+              <option value="">Select Product</option>
+              {products.map((product) => (
+                <option key={product.id} value={product.id}>
+                  {product.name}
+                </option>
+              ))}
+            </select>
           </div>
           <div className="col-md-3">
-            <input
-              type="number"
+            <select
               name="supplier_id"
               className="form-control"
-              placeholder="Supplier ID"
               value={formData.supplier_id}
               onChange={handleChange}
               required
-            />
+            >
+              <option value="">Select Supplier</option>
+              {suppliers.map((supplier) => (
+                <option key={supplier.id} value={supplier.id}>
+                  {supplier.name}
+                </option>
+              ))}
+            </select>
           </div>
           <div className="col-md-2">
             <input
@@ -146,6 +202,18 @@ const Purchases = () => {
             />
           </div>
           <div className="col-md-2">
+            <input
+              type="number"
+              step="0.01"
+              name="price"
+              className="form-control"
+              placeholder="Price"
+              value={formData.price}
+              onChange={handleChange}
+              required
+            />
+          </div>
+          <div className="col-md-2">
             <button type="submit" className="btn btn-primary w-100">
               {editingId ? "Update" : "Add"} Purchase
             </button>
@@ -155,20 +223,28 @@ const Purchases = () => {
       <table className="table table-striped">
         <thead>
           <tr>
-            <th>Product ID</th>
-            <th>Supplier ID</th>
+            <th>Product</th>
+            <th>Supplier</th>
             <th>Quantity</th>
             <th>Purchase Date</th>
+            <th>Price</th>
             <th>Actions</th>
           </tr>
         </thead>
         <tbody>
           {purchases.map((purchase) => (
             <tr key={purchase.id}>
-              <td>{purchase.product_id}</td>
-              <td>{purchase.supplier_id}</td>
+              <td>
+                {products.find((p) => p.id === purchase.product_id)?.name ||
+                  "Unknown"}
+              </td>
+              <td>
+                {suppliers.find((s) => s.id === purchase.supplier_id)?.name ||
+                  "Unknown"}
+              </td>
               <td>{purchase.quantity}</td>
               <td>{purchase.purchase_date}</td>
+              <td>{purchase.price}</td>
               <td>
                 <button
                   className="btn btn-sm btn-warning me-2"

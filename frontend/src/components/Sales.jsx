@@ -9,11 +9,15 @@ const Sales = () => {
     sale_date: "",
     price: "",
   });
+  const [products, setProducts] = useState([]);
+  const [suppliers, setSuppliers] = useState([]);
   const [editingId, setEditingId] = useState(null);
   const [error, setError] = useState("");
 
   useEffect(() => {
     fetchSales();
+    fetchProducts();
+    fetchSuppliers();
   }, []);
 
   const fetchSales = async () => {
@@ -28,6 +32,38 @@ const Sales = () => {
         "Failed to fetch sales: " + (err.response?.data?.error || err.message)
       );
       console.error("Fetch sales error:", err);
+    }
+  };
+
+  const fetchProducts = async () => {
+    try {
+      const token = localStorage.getItem("token");
+      const res = await axios.get("http://localhost:5000/api/sales/products", {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      setProducts(res.data);
+    } catch (err) {
+      setError(
+        "Failed to fetch products: " +
+          (err.response?.data?.error || err.message)
+      );
+      console.error("Fetch products error:", err);
+    }
+  };
+
+  const fetchSuppliers = async () => {
+    try {
+      const token = localStorage.getItem("token");
+      const res = await axios.get("http://localhost:5000/api/sales/suppliers", {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      setSuppliers(res.data);
+    } catch (err) {
+      setError(
+        "Failed to fetch suppliers: " +
+          (err.response?.data?.error || err.message)
+      );
+      console.error("Fetch suppliers error:", err);
     }
   };
 
@@ -97,15 +133,36 @@ const Sales = () => {
       <form onSubmit={handleSubmit} className="mb-4">
         <div className="row g-2">
           <div className="col-md-3">
-            <input
-              type="number"
+            <select
               name="product_id"
               className="form-control"
-              placeholder="Product ID"
               value={formData.product_id}
               onChange={handleChange}
               required
-            />
+            >
+              <option value="">Select Product</option>
+              {products.map((product) => (
+                <option key={product.id} value={product.id}>
+                  {product.name}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div className="col-md-3">
+            <select
+              name="supplier_id"
+              className="form-control"
+              value={formData.supplier_id}
+              onChange={handleChange}
+              required
+            >
+              <option value="">Select Supplier</option>
+              {suppliers.map((supplier) => (
+                <option key={supplier.id} value={supplier.id}>
+                  {supplier.name}
+                </option>
+              ))}
+            </select>
           </div>
           <div className="col-md-2">
             <input
@@ -150,7 +207,8 @@ const Sales = () => {
       <table className="table table-striped">
         <thead>
           <tr>
-            <th>Product ID</th>
+            <th>Product</th>
+            <th>Supplier</th>
             <th>Quantity</th>
             <th>Sale Date</th>
             <th>Price</th>
@@ -160,7 +218,14 @@ const Sales = () => {
         <tbody>
           {sales.map((sale) => (
             <tr key={sale.id}>
-              <td>{sale.product_id}</td>
+              <td>
+                {products.find((p) => p.id === sale.product_id)?.name ||
+                  "Unknown"}
+              </td>
+              <td>
+                {suppliers.find((s) => s.id === sale.supplier_id)?.name ||
+                  "Unknown"}
+              </td>
               <td>{sale.quantity}</td>
               <td>{sale.sale_date}</td>
               <td>{sale.price}</td>

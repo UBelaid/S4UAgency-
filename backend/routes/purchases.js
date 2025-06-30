@@ -47,19 +47,15 @@ router.post("/", async (req, res) => {
     if (!token) return res.status(401).json({ error: "No token provided" });
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
     const userId = decoded.id;
-    const { product_id, supplier_id, quantity, purchase_date } = req.body;
-    if (!product_id || !supplier_id || !quantity || !purchase_date) {
-      return res
-        .status(400)
-        .json({
-          error:
-            "Product ID, supplier ID, quantity, and purchase date are required",
-        });
+    const { product_id, supplier_id, quantity, purchase_date, price } =
+      req.body;
+    if (!product_id || !supplier_id || !quantity || !purchase_date || !price) {
+      return res.status(400).json({ error: "All fields are required" });
     }
     connection = await pool.getConnection();
     const [result] = await connection.query(
-      "INSERT INTO purchases (user_id, product_id, supplier_id, quantity, purchase_date) VALUES (?, ?, ?, ?, ?)",
-      [userId, product_id, supplier_id, quantity, purchase_date]
+      "INSERT INTO purchases (user_id, product_id, supplier_id, quantity, purchase_date, price) VALUES (?, ?, ?, ?, ?, ?)",
+      [userId, product_id, supplier_id, quantity, purchase_date, price]
     );
     res
       .status(201)
@@ -85,14 +81,10 @@ router.put("/:id", async (req, res) => {
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
     const userId = decoded.id;
     const { id } = req.params;
-    const { product_id, supplier_id, quantity, purchase_date } = req.body;
-    if (!product_id || !supplier_id || !quantity || !purchase_date) {
-      return res
-        .status(400)
-        .json({
-          error:
-            "Product ID, supplier ID, quantity, and purchase date are required",
-        });
+    const { product_id, supplier_id, quantity, purchase_date, price } =
+      req.body;
+    if (!product_id || !supplier_id || !quantity || !purchase_date || !price) {
+      return res.status(400).json({ error: "All fields are required" });
     }
     connection = await pool.getConnection();
     const [purchase] = await connection.query(
@@ -102,8 +94,8 @@ router.put("/:id", async (req, res) => {
     if (purchase.length === 0)
       return res.status(403).json({ error: "Unauthorized" });
     await connection.query(
-      "UPDATE purchases SET product_id = ?, supplier_id = ?, quantity = ?, purchase_date = ? WHERE id = ?",
-      [product_id, supplier_id, quantity, purchase_date, id]
+      "UPDATE purchases SET product_id = ?, supplier_id = ?, quantity = ?, purchase_date = ?, price = ? WHERE id = ?",
+      [product_id, supplier_id, quantity, purchase_date, price, id]
     );
     res.json({ message: "Purchase updated successfully" });
   } catch (error) {
@@ -144,6 +136,50 @@ router.delete("/:id", async (req, res) => {
         error:
           "Failed to delete purchase: " + (error.sqlMessage || "Unknown error"),
       });
+  } finally {
+    if (connection) connection.release();
+  }
+});
+
+router.get("/products", async (req, res) => {
+  let connection;
+  try {
+    const token = req.headers.authorization?.split(" ")[1];
+    if (!token) return res.status(401).json({ error: "No token provided" });
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    const userId = decoded.id;
+
+    connection = await pool.getConnection();
+    const [rows] = await connection.query(
+      "SELECT id, name FROM products WHERE user_id = ?",
+      [userId]
+    );
+    res.json(rows);
+  } catch (error) {
+    console.error("Error fetching products:", error);
+    res.status(500).json({ error: "Failed to fetch products" });
+  } finally {
+    if (connection) connection.release();
+  }
+});
+
+router.get("/suppliers", async (req, res) => {
+  let connection;
+  try {
+    const token = req.headers.authorization?.split(" ")[1];
+    if (!token) return res.status(401).json({ error: "No token provided" });
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    const userId = decoded.id;
+
+    connection = await pool.getConnection();
+    const [rows] = await connection.query(
+      "SELECT id, name FROM suppliers WHERE user_id = ?",
+      [userId]
+    );
+    res.json(rows);
+  } catch (error) {
+    console.error("Error fetching suppliers:", error);
+    res.status(500).json({ error: "Failed to fetch suppliers" });
   } finally {
     if (connection) connection.release();
   }

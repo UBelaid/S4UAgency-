@@ -146,4 +146,48 @@ router.delete("/:id", async (req, res) => {
   }
 });
 
+router.get("/products", async (req, res) => {
+  let connection;
+  try {
+    const token = req.headers.authorization?.split(" ")[1];
+    if (!token) return res.status(401).json({ error: "No token provided" });
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    const userId = decoded.id;
+
+    connection = await pool.getConnection();
+    const [rows] = await connection.query(
+      "SELECT id, name FROM products WHERE user_id = ?",
+      [userId]
+    );
+    res.json(rows);
+  } catch (error) {
+    console.error("Error fetching products:", error);
+    res.status(500).json({ error: "Failed to fetch products" });
+  } finally {
+    if (connection) connection.release();
+  }
+});
+
+router.get("/suppliers", async (req, res) => {
+  let connection;
+  try {
+    const token = req.headers.authorization?.split(" ")[1];
+    if (!token) return res.status(401).json({ error: "No token provided" });
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    const userId = decoded.id;
+
+    connection = await pool.getConnection();
+    const [rows] = await connection.query(
+      "SELECT id, name FROM suppliers WHERE user_id = ?",
+      [userId]
+    );
+    res.json(rows);
+  } catch (error) {
+    console.error("Error fetching suppliers:", error);
+    res.status(500).json({ error: "Failed to fetch suppliers" });
+  } finally {
+    if (connection) connection.release();
+  }
+});
+
 module.exports = router;
