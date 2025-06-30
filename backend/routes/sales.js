@@ -2,6 +2,7 @@ const express = require("express");
 const router = express.Router();
 const mysql = require("mysql2/promise");
 const dotenv = require("dotenv");
+const jwt = require("jsonwebtoken");
 
 dotenv.config();
 
@@ -20,11 +21,15 @@ const pool = mysql.createPool(dbConfig);
 router.get("/", async (req, res) => {
   let connection;
   try {
+    const token = req.headers.authorization?.split(" ")[1];
+    if (!token) return res.status(401).json({ error: "No token provided" });
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    const userId = decoded.id;
+
     connection = await pool.getConnection();
     const [rows] = await connection.query(
-      "SELECT s.*, c.name AS client_name, p.name AS product_name FROM sales s " +
-        "JOIN clients c ON s.client_id = c.id " +
-        "JOIN products p ON s.product_id = p.id"
+      "SELECT * FROM sales WHERE user_id = ?",
+      [userId]
     );
     res.json(rows);
   } catch (error) {
@@ -38,20 +43,33 @@ router.get("/", async (req, res) => {
 router.post("/", async (req, res) => {
   let connection;
   try {
-    const { client_id, product_id, quantity, total_price, sale_date } =
-      req.body;
-    if (!client_id || !product_id || !quantity || !total_price || !sale_date) {
-      return res.status(400).json({ error: "All fields are required" });
+    const token = req.headers.authorization?.split(" ")[1];
+    if (!token) return res.status(401).json({ error: "No token provided" });
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    const userId = decoded.id;
+    const { product_id, quantity, sale_date, price } = req.body;
+    if (!product_id || !quantity || !sale_date || !price) {
+      return res
+        .status(400)
+        .json({
+          error: "Product ID, quantity, sale date, and price are required",
+        });
     }
     connection = await pool.getConnection();
-    await connection.query(
-      "INSERT INTO sales (client_id, product_id, quantity, total_price, sale_date) VALUES (?, ?, ?, ?, ?)",
-      [client_id, product_id, quantity, total_price, sale_date]
+    const [result] = await connection.query(
+      "INSERT INTO sales (user_id, product_id, quantity, sale_date, price) VALUES (?, ?, ?, ?, ?)",
+      [userId, product_id, quantity, sale_date, price]
     );
-    res.status(201).json({ message: "Sale added successfully" });
+    res
+      .status(201)
+      .json({ message: "Sale added successfully", id: result.insertId });
   } catch (error) {
-    console.error("Error adding sale:", error);
-    res.status(500).json({ error: "Failed to add sale" });
+    console.error("Error adding sale:", error.sqlMessage || error);
+    res
+      .status(500)
+      .json({
+        error: "Failed to add sale: " + (error.sqlMessage || "Unknown error"),
+      });
   } finally {
     if (connection) connection.release();
   }
@@ -60,21 +78,39 @@ router.post("/", async (req, res) => {
 router.put("/:id", async (req, res) => {
   let connection;
   try {
+    const token = req.headers.authorization?.split(" ")[1];
+    if (!token) return res.status(401).json({ error: "No token provided" });
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    const userId = decoded.id;
     const { id } = req.params;
-    const { client_id, product_id, quantity, total_price, sale_date } =
-      req.body;
-    if (!client_id || !product_id || !quantity || !total_price || !sale_date) {
-      return res.status(400).json({ error: "All fields are required" });
+    const { product_id, quantity, sale_date, price } = req.body;
+    if (!product_id || !quantity || !sale_date || !price) {
+      return res
+        .status(400)
+        .json({
+          error: "Product ID, quantity, sale date, and price are required",
+        });
     }
     connection = await pool.getConnection();
+    const [sale] = await connection.query(
+      "SELECT * FROM sales WHERE id = ? AND user_id = ?",
+      [id, userId]
+    );
+    if (sale.length === 0)
+      return res.status(403).json({ error: "Unauthorized" });
     await connection.query(
-      "UPDATE sales SET client_id = ?, product_id = ?, quantity = ?, total_price = ?, sale_date = ? WHERE id = ?",
-      [client_id, product_id, quantity, total_price, sale_date, id]
+      "UPDATE sales SET product_id = ?, quantity = ?, sale_date = ?, price = ? WHERE id = ?",
+      [product_id, quantity, sale_date, price, id]
     );
     res.json({ message: "Sale updated successfully" });
   } catch (error) {
-    console.error("Error updating sale:", error);
-    res.status(500).json({ error: "Failed to update sale" });
+    console.error("Error updating sale:", error.sqlMessage || error);
+    res
+      .status(500)
+      .json({
+        error:
+          "Failed to update sale: " + (error.sqlMessage || "Unknown error"),
+      });
   } finally {
     if (connection) connection.release();
   }
@@ -83,13 +119,28 @@ router.put("/:id", async (req, res) => {
 router.delete("/:id", async (req, res) => {
   let connection;
   try {
+    const token = req.headers.authorization?.split(" ")[1];
+    if (!token) return res.status(401).json({ error: "No token provided" });
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    const userId = decoded.id;
     const { id } = req.params;
     connection = await pool.getConnection();
+    const [sale] = await connection.query(
+      "SELECT * FROM sales WHERE id = ? AND user_id = ?",
+      [id, userId]
+    );
+    if (sale.length === 0)
+      return res.status(403).json({ error: "Unauthorized" });
     await connection.query("DELETE FROM sales WHERE id = ?", [id]);
     res.json({ message: "Sale deleted successfully" });
   } catch (error) {
-    console.error("Error deleting sale:", error);
-    res.status(500).json({ error: "Failed to delete sale" });
+    console.error("Error deleting sale:", error.sqlMessage || error);
+    res
+      .status(500)
+      .json({
+        error:
+          "Failed to delete sale: " + (error.sqlMessage || "Unknown error"),
+      });
   } finally {
     if (connection) connection.release();
   }

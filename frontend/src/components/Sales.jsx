@@ -3,22 +3,17 @@ import axios from "axios";
 
 const Sales = () => {
   const [sales, setSales] = useState([]);
-  const [clients, setClients] = useState([]);
-  const [products, setProducts] = useState([]);
   const [formData, setFormData] = useState({
-    client_id: "",
     product_id: "",
     quantity: "",
-    total_price: "",
     sale_date: "",
+    price: "",
   });
   const [editingId, setEditingId] = useState(null);
   const [error, setError] = useState("");
 
   useEffect(() => {
     fetchSales();
-    fetchClients();
-    fetchProducts();
   }, []);
 
   const fetchSales = async () => {
@@ -36,37 +31,6 @@ const Sales = () => {
     }
   };
 
-  const fetchClients = async () => {
-    try {
-      const token = localStorage.getItem("token");
-      const res = await axios.get("http://localhost:5000/api/clients", {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      setClients(res.data);
-    } catch (err) {
-      setError(
-        "Failed to fetch clients: " + (err.response?.data?.error || err.message)
-      );
-      console.error("Fetch clients error:", err);
-    }
-  };
-
-  const fetchProducts = async () => {
-    try {
-      const token = localStorage.getItem("token");
-      const res = await axios.get("http://localhost:5000/api/products", {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      setProducts(res.data);
-    } catch (err) {
-      setError(
-        "Failed to fetch products: " +
-          (err.response?.data?.error || err.message)
-      );
-      console.error("Fetch products error:", err);
-    }
-  };
-
   const handleChange = (e) => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
   };
@@ -75,43 +39,38 @@ const Sales = () => {
     e.preventDefault();
     try {
       const token = localStorage.getItem("token");
-      if (editingId) {
-        await axios.put(
-          `http://localhost:5000/api/sales/${editingId}`,
-          formData,
-          {
-            headers: { Authorization: `Bearer ${token}` },
-          }
-        );
-      } else {
-        await axios.post("http://localhost:5000/api/sales", formData, {
+      const url = editingId
+        ? `http://localhost:5000/api/sales/${editingId}`
+        : "http://localhost:5000/api/sales";
+      const method = editingId ? "put" : "post";
+      await axios[method](
+        url,
+        {
+          ...formData,
+          quantity: parseInt(formData.quantity),
+          price: parseFloat(formData.price),
+        },
+        {
           headers: { Authorization: `Bearer ${token}` },
-        });
-      }
+        }
+      );
       fetchSales();
-      setFormData({
-        client_id: "",
-        product_id: "",
-        quantity: "",
-        total_price: "",
-        sale_date: "",
-      });
+      setFormData({ product_id: "", quantity: "", sale_date: "", price: "" });
       setEditingId(null);
     } catch (err) {
       setError(
         "Failed to save sale: " + (err.response?.data?.error || err.message)
       );
-      console.error("Save sale error:", err);
+      console.error("Save sale error:", err.response?.data || err);
     }
   };
 
   const handleEdit = (sale) => {
     setFormData({
-      client_id: sale.client_id,
       product_id: sale.product_id,
       quantity: sale.quantity,
-      total_price: sale.total_price,
       sale_date: sale.sale_date,
+      price: sale.price,
     });
     setEditingId(sale.id);
   };
@@ -127,7 +86,7 @@ const Sales = () => {
       setError(
         "Failed to delete sale: " + (err.response?.data?.error || err.message)
       );
-      console.error("Delete sale error:", err);
+      console.error("Delete sale error:", err.response?.data || err);
     }
   };
 
@@ -137,37 +96,16 @@ const Sales = () => {
       {error && <div className="alert alert-danger">{error}</div>}
       <form onSubmit={handleSubmit} className="mb-4">
         <div className="row g-2">
-          <div className="col-md-2">
-            <select
-              name="client_id"
-              className="form-control"
-              value={formData.client_id}
-              onChange={handleChange}
-              required
-            >
-              <option value="">Select Client</option>
-              {clients.map((client) => (
-                <option key={client.id} value={client.id}>
-                  {client.name}
-                </option>
-              ))}
-            </select>
-          </div>
-          <div className="col-md-2">
-            <select
+          <div className="col-md-3">
+            <input
+              type="number"
               name="product_id"
               className="form-control"
+              placeholder="Product ID"
               value={formData.product_id}
               onChange={handleChange}
               required
-            >
-              <option value="">Select Product</option>
-              {products.map((product) => (
-                <option key={product.id} value={product.id}>
-                  {product.name}
-                </option>
-              ))}
-            </select>
+            />
           </div>
           <div className="col-md-2">
             <input
@@ -176,18 +114,6 @@ const Sales = () => {
               className="form-control"
               placeholder="Quantity"
               value={formData.quantity}
-              onChange={handleChange}
-              required
-            />
-          </div>
-          <div className="col-md-2">
-            <input
-              type="number"
-              step="0.01"
-              name="total_price"
-              className="form-control"
-              placeholder="Total Price"
-              value={formData.total_price}
               onChange={handleChange}
               required
             />
@@ -203,6 +129,18 @@ const Sales = () => {
             />
           </div>
           <div className="col-md-2">
+            <input
+              type="number"
+              step="0.01"
+              name="price"
+              className="form-control"
+              placeholder="Price"
+              value={formData.price}
+              onChange={handleChange}
+              required
+            />
+          </div>
+          <div className="col-md-2">
             <button type="submit" className="btn btn-primary w-100">
               {editingId ? "Update" : "Add"} Sale
             </button>
@@ -212,22 +150,20 @@ const Sales = () => {
       <table className="table table-striped">
         <thead>
           <tr>
-            <th>Client</th>
-            <th>Product</th>
+            <th>Product ID</th>
             <th>Quantity</th>
-            <th>Total Price</th>
             <th>Sale Date</th>
+            <th>Price</th>
             <th>Actions</th>
           </tr>
         </thead>
         <tbody>
           {sales.map((sale) => (
             <tr key={sale.id}>
-              <td>{sale.client_name}</td>
-              <td>{sale.product_name}</td>
+              <td>{sale.product_id}</td>
               <td>{sale.quantity}</td>
-              <td>${sale.total_price}</td>
               <td>{sale.sale_date}</td>
+              <td>{sale.price}</td>
               <td>
                 <button
                   className="btn btn-sm btn-warning me-2"

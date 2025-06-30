@@ -2,6 +2,7 @@ const express = require("express");
 const router = express.Router();
 const mysql = require("mysql2/promise");
 const dotenv = require("dotenv");
+const jwt = require("jsonwebtoken");
 
 dotenv.config();
 
@@ -20,11 +21,15 @@ const pool = mysql.createPool(dbConfig);
 router.get("/", async (req, res) => {
   let connection;
   try {
+    const token = req.headers.authorization?.split(" ")[1];
+    if (!token) return res.status(401).json({ error: "No token provided" });
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    const userId = decoded.id;
+
     connection = await pool.getConnection();
     const [rows] = await connection.query(
-      "SELECT p.*, s.name AS supplier_name, pr.name AS product_name FROM purchases p " +
-        "JOIN suppliers s ON p.supplier_id = s.id " +
-        "JOIN products pr ON p.product_id = pr.id"
+      "SELECT * FROM purchases WHERE user_id = ?",
+      [userId]
     );
     res.json(rows);
   } catch (error) {
@@ -38,26 +43,35 @@ router.get("/", async (req, res) => {
 router.post("/", async (req, res) => {
   let connection;
   try {
-    const { supplier_id, product_id, quantity, total_price, purchase_date } =
-      req.body;
-    if (
-      !supplier_id ||
-      !product_id ||
-      !quantity ||
-      !total_price ||
-      !purchase_date
-    ) {
-      return res.status(400).json({ error: "All fields are required" });
+    const token = req.headers.authorization?.split(" ")[1];
+    if (!token) return res.status(401).json({ error: "No token provided" });
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    const userId = decoded.id;
+    const { product_id, supplier_id, quantity, purchase_date } = req.body;
+    if (!product_id || !supplier_id || !quantity || !purchase_date) {
+      return res
+        .status(400)
+        .json({
+          error:
+            "Product ID, supplier ID, quantity, and purchase date are required",
+        });
     }
     connection = await pool.getConnection();
-    await connection.query(
-      "INSERT INTO purchases (supplier_id, product_id, quantity, total_price, purchase_date) VALUES (?, ?, ?, ?, ?)",
-      [supplier_id, product_id, quantity, total_price, purchase_date]
+    const [result] = await connection.query(
+      "INSERT INTO purchases (user_id, product_id, supplier_id, quantity, purchase_date) VALUES (?, ?, ?, ?, ?)",
+      [userId, product_id, supplier_id, quantity, purchase_date]
     );
-    res.status(201).json({ message: "Purchase added successfully" });
+    res
+      .status(201)
+      .json({ message: "Purchase added successfully", id: result.insertId });
   } catch (error) {
-    console.error("Error adding purchase:", error);
-    res.status(500).json({ error: "Failed to add purchase" });
+    console.error("Error adding purchase:", error.sqlMessage || error);
+    res
+      .status(500)
+      .json({
+        error:
+          "Failed to add purchase: " + (error.sqlMessage || "Unknown error"),
+      });
   } finally {
     if (connection) connection.release();
   }
@@ -66,27 +80,40 @@ router.post("/", async (req, res) => {
 router.put("/:id", async (req, res) => {
   let connection;
   try {
+    const token = req.headers.authorization?.split(" ")[1];
+    if (!token) return res.status(401).json({ error: "No token provided" });
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    const userId = decoded.id;
     const { id } = req.params;
-    const { supplier_id, product_id, quantity, total_price, purchase_date } =
-      req.body;
-    if (
-      !supplier_id ||
-      !product_id ||
-      !quantity ||
-      !total_price ||
-      !purchase_date
-    ) {
-      return res.status(400).json({ error: "All fields are required" });
+    const { product_id, supplier_id, quantity, purchase_date } = req.body;
+    if (!product_id || !supplier_id || !quantity || !purchase_date) {
+      return res
+        .status(400)
+        .json({
+          error:
+            "Product ID, supplier ID, quantity, and purchase date are required",
+        });
     }
     connection = await pool.getConnection();
+    const [purchase] = await connection.query(
+      "SELECT * FROM purchases WHERE id = ? AND user_id = ?",
+      [id, userId]
+    );
+    if (purchase.length === 0)
+      return res.status(403).json({ error: "Unauthorized" });
     await connection.query(
-      "UPDATE purchases SET supplier_id = ?, product_id = ?, quantity = ?, total_price = ?, purchase_date = ? WHERE id = ?",
-      [supplier_id, product_id, quantity, total_price, purchase_date, id]
+      "UPDATE purchases SET product_id = ?, supplier_id = ?, quantity = ?, purchase_date = ? WHERE id = ?",
+      [product_id, supplier_id, quantity, purchase_date, id]
     );
     res.json({ message: "Purchase updated successfully" });
   } catch (error) {
-    console.error("Error updating purchase:", error);
-    res.status(500).json({ error: "Failed to update purchase" });
+    console.error("Error updating purchase:", error.sqlMessage || error);
+    res
+      .status(500)
+      .json({
+        error:
+          "Failed to update purchase: " + (error.sqlMessage || "Unknown error"),
+      });
   } finally {
     if (connection) connection.release();
   }
@@ -95,13 +122,28 @@ router.put("/:id", async (req, res) => {
 router.delete("/:id", async (req, res) => {
   let connection;
   try {
+    const token = req.headers.authorization?.split(" ")[1];
+    if (!token) return res.status(401).json({ error: "No token provided" });
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    const userId = decoded.id;
     const { id } = req.params;
     connection = await pool.getConnection();
+    const [purchase] = await connection.query(
+      "SELECT * FROM purchases WHERE id = ? AND user_id = ?",
+      [id, userId]
+    );
+    if (purchase.length === 0)
+      return res.status(403).json({ error: "Unauthorized" });
     await connection.query("DELETE FROM purchases WHERE id = ?", [id]);
     res.json({ message: "Purchase deleted successfully" });
   } catch (error) {
-    console.error("Error deleting purchase:", error);
-    res.status(500).json({ error: "Failed to delete purchase" });
+    console.error("Error deleting purchase:", error.sqlMessage || error);
+    res
+      .status(500)
+      .json({
+        error:
+          "Failed to delete purchase: " + (error.sqlMessage || "Unknown error"),
+      });
   } finally {
     if (connection) connection.release();
   }

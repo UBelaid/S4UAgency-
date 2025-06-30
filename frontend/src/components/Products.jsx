@@ -40,19 +40,21 @@ const Products = () => {
     e.preventDefault();
     try {
       const token = localStorage.getItem("token");
-      if (editingId) {
-        await axios.put(
-          `http://localhost:5000/api/products/${editingId}`,
-          formData,
-          {
-            headers: { Authorization: `Bearer ${token}` },
-          }
-        );
-      } else {
-        await axios.post("http://localhost:5000/api/products", formData, {
+      const url = editingId
+        ? `http://localhost:5000/api/products/${editingId}`
+        : "http://localhost:5000/api/products";
+      const method = editingId ? "put" : "post";
+      await axios[method](
+        url,
+        {
+          ...formData,
+          price: parseFloat(formData.price),
+          stock: parseInt(formData.stock),
+        },
+        {
           headers: { Authorization: `Bearer ${token}` },
-        });
-      }
+        }
+      );
       fetchProducts();
       setFormData({ name: "", description: "", price: "", stock: "" });
       setEditingId(null);
@@ -60,7 +62,7 @@ const Products = () => {
       setError(
         "Failed to save product: " + (err.response?.data?.error || err.message)
       );
-      console.error("Save product error:", err);
+      console.error("Save product error:", err.response?.data || err);
     }
   };
 
@@ -86,7 +88,7 @@ const Products = () => {
         "Failed to delete product: " +
           (err.response?.data?.error || err.message)
       );
-      console.error("Delete product error:", err);
+      console.error("Delete product error:", err.response?.data || err);
     }
   };
 
@@ -120,7 +122,6 @@ const Products = () => {
           <div className="col-md-2">
             <input
               type="number"
-              step="0.01"
               name="price"
               className="form-control"
               placeholder="Price"
@@ -162,7 +163,7 @@ const Products = () => {
             <tr key={product.id}>
               <td>{product.name}</td>
               <td>{product.description}</td>
-              <td>${product.price}</td>
+              <td>{product.price}</td>
               <td>{product.stock}</td>
               <td>
                 <button

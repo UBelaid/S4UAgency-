@@ -3,13 +3,10 @@ import axios from "axios";
 
 const Purchases = () => {
   const [purchases, setPurchases] = useState([]);
-  const [suppliers, setSuppliers] = useState([]);
-  const [products, setProducts] = useState([]);
   const [formData, setFormData] = useState({
-    supplier_id: "",
     product_id: "",
+    supplier_id: "",
     quantity: "",
-    total_price: "",
     purchase_date: "",
   });
   const [editingId, setEditingId] = useState(null);
@@ -17,8 +14,6 @@ const Purchases = () => {
 
   useEffect(() => {
     fetchPurchases();
-    fetchSuppliers();
-    fetchProducts();
   }, []);
 
   const fetchPurchases = async () => {
@@ -37,38 +32,6 @@ const Purchases = () => {
     }
   };
 
-  const fetchSuppliers = async () => {
-    try {
-      const token = localStorage.getItem("token");
-      const res = await axios.get("http://localhost:5000/api/suppliers", {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      setSuppliers(res.data);
-    } catch (err) {
-      setError(
-        "Failed to fetch suppliers: " +
-          (err.response?.data?.error || err.message)
-      );
-      console.error("Fetch suppliers error:", err);
-    }
-  };
-
-  const fetchProducts = async () => {
-    try {
-      const token = localStorage.getItem("token");
-      const res = await axios.get("http://localhost:5000/api/products", {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      setProducts(res.data);
-    } catch (err) {
-      setError(
-        "Failed to fetch products: " +
-          (err.response?.data?.error || err.message)
-      );
-      console.error("Fetch products error:", err);
-    }
-  };
-
   const handleChange = (e) => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
   };
@@ -77,25 +40,25 @@ const Purchases = () => {
     e.preventDefault();
     try {
       const token = localStorage.getItem("token");
-      if (editingId) {
-        await axios.put(
-          `http://localhost:5000/api/purchases/${editingId}`,
-          formData,
-          {
-            headers: { Authorization: `Bearer ${token}` },
-          }
-        );
-      } else {
-        await axios.post("http://localhost:5000/api/purchases", formData, {
+      const url = editingId
+        ? `http://localhost:5000/api/purchases/${editingId}`
+        : "http://localhost:5000/api/purchases";
+      const method = editingId ? "put" : "post";
+      await axios[method](
+        url,
+        {
+          ...formData,
+          quantity: parseInt(formData.quantity),
+        },
+        {
           headers: { Authorization: `Bearer ${token}` },
-        });
-      }
+        }
+      );
       fetchPurchases();
       setFormData({
-        supplier_id: "",
         product_id: "",
+        supplier_id: "",
         quantity: "",
-        total_price: "",
         purchase_date: "",
       });
       setEditingId(null);
@@ -103,16 +66,15 @@ const Purchases = () => {
       setError(
         "Failed to save purchase: " + (err.response?.data?.error || err.message)
       );
-      console.error("Save purchase error:", err);
+      console.error("Save purchase error:", err.response?.data || err);
     }
   };
 
   const handleEdit = (purchase) => {
     setFormData({
-      supplier_id: purchase.supplier_id,
       product_id: purchase.product_id,
+      supplier_id: purchase.supplier_id,
       quantity: purchase.quantity,
-      total_price: purchase.total_price,
       purchase_date: purchase.purchase_date,
     });
     setEditingId(purchase.id);
@@ -130,7 +92,7 @@ const Purchases = () => {
         "Failed to delete purchase: " +
           (err.response?.data?.error || err.message)
       );
-      console.error("Delete purchase error:", err);
+      console.error("Delete purchase error:", err.response?.data || err);
     }
   };
 
@@ -140,37 +102,27 @@ const Purchases = () => {
       {error && <div className="alert alert-danger">{error}</div>}
       <form onSubmit={handleSubmit} className="mb-4">
         <div className="row g-2">
-          <div className="col-md-2">
-            <select
-              name="supplier_id"
-              className="form-control"
-              value={formData.supplier_id}
-              onChange={handleChange}
-              required
-            >
-              <option value="">Select Supplier</option>
-              {suppliers.map((supplier) => (
-                <option key={supplier.id} value={supplier.id}>
-                  {supplier.name}
-                </option>
-              ))}
-            </select>
-          </div>
-          <div className="col-md-2">
-            <select
+          <div className="col-md-3">
+            <input
+              type="number"
               name="product_id"
               className="form-control"
+              placeholder="Product ID"
               value={formData.product_id}
               onChange={handleChange}
               required
-            >
-              <option value="">Select Product</option>
-              {products.map((product) => (
-                <option key={product.id} value={product.id}>
-                  {product.name}
-                </option>
-              ))}
-            </select>
+            />
+          </div>
+          <div className="col-md-3">
+            <input
+              type="number"
+              name="supplier_id"
+              className="form-control"
+              placeholder="Supplier ID"
+              value={formData.supplier_id}
+              onChange={handleChange}
+              required
+            />
           </div>
           <div className="col-md-2">
             <input
@@ -179,18 +131,6 @@ const Purchases = () => {
               className="form-control"
               placeholder="Quantity"
               value={formData.quantity}
-              onChange={handleChange}
-              required
-            />
-          </div>
-          <div className="col-md-2">
-            <input
-              type="number"
-              step="0.01"
-              name="total_price"
-              className="form-control"
-              placeholder="Total Price"
-              value={formData.total_price}
               onChange={handleChange}
               required
             />
@@ -215,10 +155,9 @@ const Purchases = () => {
       <table className="table table-striped">
         <thead>
           <tr>
-            <th>Supplier</th>
-            <th>Product</th>
+            <th>Product ID</th>
+            <th>Supplier ID</th>
             <th>Quantity</th>
-            <th>Total Price</th>
             <th>Purchase Date</th>
             <th>Actions</th>
           </tr>
@@ -226,10 +165,9 @@ const Purchases = () => {
         <tbody>
           {purchases.map((purchase) => (
             <tr key={purchase.id}>
-              <td>{purchase.supplier_name}</td>
-              <td>{purchase.product_name}</td>
+              <td>{purchase.product_id}</td>
+              <td>{purchase.supplier_id}</td>
               <td>{purchase.quantity}</td>
-              <td>${purchase.total_price}</td>
               <td>{purchase.purchase_date}</td>
               <td>
                 <button
