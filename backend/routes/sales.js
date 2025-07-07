@@ -47,18 +47,17 @@ router.post("/", async (req, res) => {
     if (!token) return res.status(401).json({ error: "No token provided" });
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
     const userId = decoded.id;
-    const { product_id, quantity, sale_date, price } = req.body;
-    if (!product_id || !quantity || !sale_date || !price) {
-      return res
-        .status(400)
-        .json({
-          error: "Product ID, quantity, sale date, and price are required",
-        });
+    const { product_id, supplier_id, quantity, sale_date, price } = req.body;
+    if (!product_id || !supplier_id || !quantity || !sale_date || !price) {
+      return res.status(400).json({
+        error:
+          "Product ID, supplier ID, quantity, sale date, and price are required",
+      });
     }
     connection = await pool.getConnection();
     const [result] = await connection.query(
-      "INSERT INTO sales (user_id, product_id, quantity, sale_date, price) VALUES (?, ?, ?, ?, ?)",
-      [userId, product_id, quantity, sale_date, price]
+      "INSERT INTO sales (user_id, product_id, supplier_id, quantity, sale_date, price) VALUES (?, ?, ?, ?, ?, ?)",
+      [userId, product_id, supplier_id, quantity, sale_date, price]
     );
     res
       .status(201)
@@ -83,13 +82,12 @@ router.put("/:id", async (req, res) => {
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
     const userId = decoded.id;
     const { id } = req.params;
-    const { product_id, quantity, sale_date, price } = req.body;
-    if (!product_id || !quantity || !sale_date || !price) {
-      return res
-        .status(400)
-        .json({
-          error: "Product ID, quantity, sale date, and price are required",
-        });
+    const { product_id, supplier_id, quantity, sale_date, price } = req.body;
+    if (!product_id || !supplier_id || !quantity || !sale_date || !price) {
+      return res.status(400).json({
+        error:
+          "Product ID, supplier ID, quantity, sale date, and price are required",
+      });
     }
     connection = await pool.getConnection();
     const [sale] = await connection.query(
@@ -99,8 +97,8 @@ router.put("/:id", async (req, res) => {
     if (sale.length === 0)
       return res.status(403).json({ error: "Unauthorized" });
     await connection.query(
-      "UPDATE sales SET product_id = ?, quantity = ?, sale_date = ?, price = ? WHERE id = ?",
-      [product_id, quantity, sale_date, price, id]
+      "UPDATE sales SET product_id = ?, supplier_id = ?, quantity = ?, sale_date = ?, price = ? WHERE id = ?",
+      [product_id, supplier_id, quantity, sale_date, price, id]
     );
     res.json({ message: "Sale updated successfully" });
   } catch (error) {

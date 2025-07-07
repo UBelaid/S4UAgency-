@@ -5,6 +5,7 @@ const Sales = () => {
   const [sales, setSales] = useState([]);
   const [formData, setFormData] = useState({
     product_id: "",
+    supplier_id: "",
     quantity: "",
     sale_date: "",
     price: "",
@@ -91,7 +92,13 @@ const Sales = () => {
         }
       );
       fetchSales();
-      setFormData({ product_id: "", quantity: "", sale_date: "", price: "" });
+      setFormData({
+        product_id: "",
+        supplier_id: "",
+        quantity: "",
+        sale_date: "",
+        price: "",
+      });
       setEditingId(null);
     } catch (err) {
       setError(
@@ -104,6 +111,7 @@ const Sales = () => {
   const handleEdit = (sale) => {
     setFormData({
       product_id: sale.product_id,
+      supplier_id: sale.supplier_id,
       quantity: sale.quantity,
       sale_date: sale.sale_date,
       price: sale.price,
